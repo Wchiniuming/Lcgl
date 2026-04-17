@@ -219,7 +219,7 @@ export default function Portfolio() {
                 }}
                 className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm"
               >
-                + 新交易
+                + 交易记录
               </button>
             </div>
           </div>
@@ -493,29 +493,62 @@ export default function Portfolio() {
         {/* Transactions tab */}
         {activeTab === 'transactions' && (
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-slate-500">记录新的买入/卖出/分红等交易 📝</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingHolding(null);
-                  setShowForm(true);
-                }}
-                className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm"
-              >
-                + 新交易
-              </button>
+            <div className="mb-4">
+              <p className="text-sm text-slate-500">交易历史记录 📋</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-sm">
-              <div className="text-5xl mb-4 opacity-40">📋</div>
-              <div className="text-base font-medium text-slate-500">开始记录您的交易</div>
-              <div className="text-sm text-slate-400 mt-2">
-                点击「+ 新交易」按钮添加买入、卖出、分红记录
+            {holdings.filter((h) => h.notes && typeof h.notes === 'string' && h.notes.length > 2)
+              .length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center shadow-sm">
+                <div className="text-5xl mb-4 opacity-40">📋</div>
+                <div className="text-base font-medium text-slate-500">暂无交易记录</div>
+                <div className="text-sm text-slate-400 mt-2">
+                  在持仓页面点击「交易」按钮记录买入、卖出、分红等交易
+                </div>
               </div>
-              <div className="text-xs text-slate-300 mt-1">
-                支持：买入、卖出、分红、增持、减持、定投
+            ) : (
+              <div className="space-y-3">
+                {holdings
+                  .filter((h) => h.notes && typeof h.notes === 'string' && h.notes.length > 2)
+                  .map((h) => {
+                    let transactions: any[] = [];
+                    try {
+                      transactions = JSON.parse(h.notes as string);
+                    } catch {}
+                    return transactions.map((tx, idx) => (
+                      <div
+                        key={`${h.id}-${idx}`}
+                        className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
+                                tx.type === 'buy'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : tx.type === 'sell'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-amber-100 text-amber-700'
+                              }`}
+                            >
+                              {tx.type === 'buy' ? '买入' : tx.type === 'sell' ? '卖出' : '分红'}
+                            </span>
+                            <span className="font-medium text-slate-800">{h.symbol}</span>
+                            {h.name && <span className="text-sm text-slate-500">- {h.name}</span>}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-medium text-slate-700">
+                              {tx.amount != null &&
+                                `¥${Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              {tx.shares != null && ` × ${tx.shares}`}
+                            </div>
+                            <div className="text-xs text-slate-400">{tx.date}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })}
               </div>
-            </div>
+            )}
           </div>
         )}
 

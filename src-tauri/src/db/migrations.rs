@@ -10,13 +10,11 @@ pub struct Migration {
 }
 
 pub fn get_migrations() -> Vec<Migration> {
-    vec![
-        Migration {
-            version: 1,
-            description: "Initial schema - P0 entities",
-            sql: include_str!("schema.sql"),
-        },
-    ]
+    vec![Migration {
+        version: 1,
+        description: "Initial schema - P0 entities",
+        sql: include_str!("schema.sql"),
+    }]
 }
 
 pub fn get_schema_version(conn: &Connection) -> Result<i32> {
@@ -53,8 +51,11 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 
     for migration in get_migrations() {
         if migration.version > current_version {
-            apply_migration(conn, migration)?;
-            println!("Applied migration version {}: {}", migration.version, migration.description);
+            apply_migration(conn, &migration)?;
+            println!(
+                "Applied migration version {}: {}",
+                migration.version, migration.description
+            );
         }
     }
 
@@ -72,7 +73,7 @@ pub fn initialize_database(db_path: &Path) -> Result<Connection> {
         "PRAGMA journal_mode = WAL;
          PRAGMA synchronous = NORMAL;
          PRAGMA foreign_keys = ON;
-         PRAGMA busy_timeout = 5000;"
+         PRAGMA busy_timeout = 5000;",
     )?;
 
     run_migrations(&conn)?;
@@ -96,18 +97,16 @@ mod tests {
         let version = get_schema_version(&conn).unwrap();
         assert_eq!(version, CURRENT_SCHEMA_VERSION);
 
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM account_categories",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM account_categories", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         assert!(count > 0);
 
-        let setting_count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM settings",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let setting_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM settings", [], |row| row.get(0))
+            .unwrap();
         assert!(setting_count > 0);
     }
 }

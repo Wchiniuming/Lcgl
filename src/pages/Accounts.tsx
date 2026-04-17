@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import QuickEntryModal from '../components/QuickEntryModal';
-import LoanCalculator from '../components/LoanCalculator';
 import {
   Account,
   AccountCategory,
@@ -13,14 +12,12 @@ import {
   deleteAccount,
   getTemplates,
   createTemplate,
-  updateTemplate,
-  deleteTemplate,
   getSnapshots,
   createSnapshot,
   deleteSnapshot,
 } from '../lib/api';
 
-type ViewMode = 'list' | 'form' | 'templates' | 'snapshots' | 'calculator';
+type ViewMode = 'list' | 'form' | 'snapshots';
 type AccountTypeFilter = 'all' | 'asset' | 'liability';
 
 function IconPlus() {
@@ -192,7 +189,6 @@ export default function Accounts() {
   const [formSubmitting, setFormSubmitting] = useState(false);
 
   const [showQuickEntry, setShowQuickEntry] = useState(false);
-  const [templateEditId, setTemplateEditId] = useState<number | null>(null);
   const [templateForm, setTemplateForm] = useState({
     name: '',
     description: '',
@@ -202,7 +198,8 @@ export default function Accounts() {
     amount: '',
     notes: '',
   });
-  const [templateErrors, setTemplateErrors] = useState<Record<string, string>>({});
+  const [showTemplateList, setShowTemplateList] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
 
   const [snapshotNotes, setSnapshotNotes] = useState('');
   const [snapshotSaving, setSnapshotSaving] = useState(false);
@@ -349,81 +346,6 @@ export default function Accounts() {
       setView('list');
     } catch (err) {
       console.error('Delete failed', err);
-    }
-  }
-
-  function applyTemplate(tmpl: Template) {
-    setTemplateEditId(tmpl.id);
-    setTemplateForm({
-      name: tmpl.name,
-      description: tmpl.description ?? '',
-      template_type: tmpl.template_type as 'account',
-      category_id: tmpl.category_id ?? '',
-      account_type: tmpl.account_type ?? '',
-      amount: tmpl.amount != null ? String(tmpl.amount) : '',
-      notes: tmpl.notes ?? '',
-    });
-    setTemplateErrors({});
-    setView('templates');
-  }
-
-  async function handleSaveTemplate() {
-    const errs: Record<string, string> = {};
-    if (!templateForm.name.trim()) errs.name = '请输入模板名称';
-    setTemplateErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-
-    setFormSubmitting(true);
-    try {
-      const payload = {
-        name: templateForm.name.trim(),
-        description: templateForm.description || null,
-        template_type: 'account' as const,
-        category_id: templateForm.category_id ? parseInt(String(templateForm.category_id)) : null,
-        account_type: templateForm.account_type || null,
-        transaction_type: null,
-        amount: templateForm.amount ? parseFloat(templateForm.amount) : null,
-        counterparty_id: null,
-        notes: templateForm.notes || null,
-      };
-      if (templateEditId) {
-        const existing = templates.find((t) => t.id === templateEditId);
-        if (existing) {
-          await updateTemplate({
-            ...existing,
-            ...payload,
-            is_active: true,
-            use_count: existing.use_count,
-          });
-        }
-      } else {
-        await createTemplate(payload as Parameters<typeof createTemplate>[0]);
-      }
-      setTemplateEditId(null);
-      setTemplateForm({
-        name: '',
-        description: '',
-        template_type: 'account',
-        category_id: '',
-        account_type: '',
-        amount: '',
-        notes: '',
-      });
-      await loadData();
-    } catch (err) {
-      console.error('Save template failed', err);
-    } finally {
-      setFormSubmitting(false);
-    }
-  }
-
-  async function handleDeleteTemplate(id: number) {
-    if (!confirm('确定要删除该模板吗？')) return;
-    try {
-      await deleteTemplate(id);
-      await loadData();
-    } catch (err) {
-      console.error('Delete template failed', err);
     }
   }
 
@@ -582,9 +504,7 @@ export default function Accounts() {
           {(
             [
               { key: 'list', label: '账户列表' },
-              { key: 'templates', label: '模板管理' },
               { key: 'snapshots', label: '历史快照' },
-              { key: 'calculator', label: '贷款计算器' },
             ] as const
           ).map((tab) => (
             <button
@@ -594,7 +514,6 @@ export default function Accounts() {
                 setView(tab.key);
                 setEditMode(false);
                 setSelectedAccount(null);
-                setTemplateEditId(null);
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 view === tab.key
@@ -782,7 +701,7 @@ export default function Accounts() {
                         <button
                           key={t}
                           type="button"
-                          onClick={() => setFormData({ ...formData, type: t })}
+                          onClick={() => setFormData({ ...formData, type: t, category_id: '' })}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                             formData.type === t
                               ? t === 'asset'
@@ -809,7 +728,7 @@ export default function Accounts() {
                         <button
                           key={t}
                           type="button"
-                          onClick={() => setFormData({ ...formData, type: t })}
+                          onClick={() => setFormData({ ...formData, type: t, category_id: '' })}
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                             formData.type === t
                               ? t === 'asset'
@@ -1162,241 +1081,125 @@ export default function Accounts() {
                     </>
                   )}
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {view === 'templates' && (
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 bg-gradient-to-r from-indigo-800 to-indigo-700">
-                <h3 className="text-white font-semibold text-sm">账户模板</h3>
-                <p className="text-indigo-200 text-xs mt-0.5">保存常用账户配置，快速创建</p>
-              </div>
-
-              <div className="p-5">
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label
-                      htmlFor="tpl-name"
-                      className="block text-sm font-medium text-slate-700 mb-1"
+                {(editMode || !selectedAccount) && (
+                  <div className="mt-3 flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplateList(!showTemplateList)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors border border-indigo-200"
                     >
-                      模板名称 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="tpl-name"
-                      type="text"
-                      value={templateForm.name}
-                      onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                      placeholder="例如：标准储蓄账户"
-                      className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
-                        ${templateErrors.name ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                        focus:outline-none`}
-                    />
-                    {templateErrors.name && (
-                      <p className="mt-1 text-xs text-red-500">{templateErrors.name}</p>
+                      {showTemplateList ? '收起模板' : '加载模板'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSaveTemplate(!showSaveTemplate)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors border border-amber-200"
+                    >
+                      {showSaveTemplate ? '收起' : '保存为模板'}
+                    </button>
+                  </div>
+                )}
+
+                {showTemplateList && (
+                  <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 className="text-sm font-medium text-slate-700 mb-2">选择模板</h4>
+                    {templates.filter((t) => !t.account_type || t.account_type === formData.type)
+                      .length === 0 ? (
+                      <div className="text-center py-3">
+                        <p className="text-xs text-slate-400">暂无可用模板</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          使用下方「保存为模板」按钮创建
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {templates
+                          .filter((t) => !t.account_type || t.account_type === formData.type)
+                          .sort((a, b) => b.use_count - a.use_count)
+                          .map((tmpl) => (
+                            <button
+                              key={tmpl.id}
+                              type="button"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  name: formData.name || tmpl.name,
+                                  category_id: tmpl.category_id
+                                    ? String(tmpl.category_id)
+                                    : formData.category_id,
+                                  interest_rate: tmpl.amount ? '' : formData.interest_rate,
+                                });
+                                setShowTemplateList(false);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-slate-700">
+                                  {tmpl.name}
+                                </span>
+                                <span className="text-xs text-slate-400">
+                                  使用 {tmpl.use_count} 次
+                                </span>
+                              </div>
+                              {tmpl.description && (
+                                <p className="text-xs text-slate-400 mt-0.5">{tmpl.description}</p>
+                              )}
+                            </button>
+                          ))}
+                      </div>
                     )}
                   </div>
-                  <div>
-                    <label
-                      htmlFor="tpl-category"
-                      className="block text-sm font-medium text-slate-700 mb-1"
-                    >
-                      默认类别
-                    </label>
-                    <select
-                      id="tpl-category"
-                      value={String(templateForm.category_id)}
-                      onChange={(e) =>
-                        setTemplateForm({ ...templateForm, category_id: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-slate-300 hover:border-slate-300 focus:outline-none"
-                    >
-                      <option value="">选择类别</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={String(c.id)}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                )}
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label
-                      htmlFor="tpl-acc-type"
-                      className="block text-sm font-medium text-slate-700 mb-1"
-                    >
-                      账户类型
-                    </label>
-                    <select
-                      id="tpl-acc-type"
-                      value={templateForm.account_type}
-                      onChange={(e) =>
-                        setTemplateForm({ ...templateForm, account_type: e.target.value })
-                      }
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-slate-300 hover:border-slate-300 focus:outline-none"
-                    >
-                      <option value="">不限</option>
-                      <option value="asset">资产</option>
-                      <option value="liability">负债</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="tpl-amount"
-                      className="block text-sm font-medium text-slate-700 mb-1"
-                    >
-                      默认余额
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
-                        ¥
-                      </span>
+                {showSaveTemplate && (
+                  <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 className="text-sm font-medium text-slate-700 mb-2">保存为模板</h4>
+                    <div className="space-y-2">
                       <input
-                        id="tpl-amount"
-                        type="number"
-                        step="0.01"
-                        value={templateForm.amount}
-                        onChange={(e) =>
-                          setTemplateForm({ ...templateForm, amount: e.target.value })
-                        }
-                        placeholder="0.00"
-                        className="w-full pl-7 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-slate-300 hover:border-slate-300 focus:outline-none"
+                        type="text"
+                        value={templateForm.name}
+                        onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                        placeholder="模板名称"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 outline-none"
                       />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!templateForm.name.trim()) {
+                            alert('请输入模板名称');
+                            return;
+                          }
+                          try {
+                            await createTemplate({
+                              name: templateForm.name.trim(),
+                              description: templateForm.description || null,
+                              template_type: 'account',
+                              category_id: formData.category_id
+                                ? parseInt(formData.category_id)
+                                : null,
+                              account_type: formData.type,
+                              transaction_type: null,
+                              amount: formData.balance ? parseFloat(formData.balance) : null,
+                              counterparty_id: null,
+                              notes: null,
+                            });
+                            await loadData();
+                            setShowSaveTemplate(false);
+                            setTemplateForm({ ...templateForm, name: '' });
+                            alert('模板保存成功');
+                          } catch (err) {
+                            alert('模板保存失败');
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors"
+                      >
+                        保存
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="mb-6">
-                  <label
-                    htmlFor="tpl-desc"
-                    className="block text-sm font-medium text-slate-700 mb-1"
-                  >
-                    描述
-                  </label>
-                  <textarea
-                    id="tpl-desc"
-                    value={templateForm.description}
-                    onChange={(e) =>
-                      setTemplateForm({ ...templateForm, description: e.target.value })
-                    }
-                    rows={2}
-                    placeholder="模板描述..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-slate-300 hover:border-slate-300 focus:outline-none resize-none"
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTemplateEditId(null);
-                      setTemplateForm({
-                        name: '',
-                        description: '',
-                        template_type: 'account',
-                        category_id: '',
-                        account_type: '',
-                        amount: '',
-                        notes: '',
-                      });
-                      setTemplateErrors({});
-                    }}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    清除
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveTemplate}
-                    disabled={formSubmitting}
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 text-white text-sm font-medium hover:from-indigo-700 hover:to-indigo-600 transition-all shadow-sm shadow-indigo-200 disabled:opacity-50"
-                  >
-                    {formSubmitting ? '保存中...' : templateEditId ? '更新模板' : '保存模板'}
-                  </button>
-                </div>
+                )}
               </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-700">
-                  已有模板 ({templates.length})
-                </h3>
-              </div>
-              {templates.length === 0 ? (
-                <div className="px-5 py-8 text-center text-sm text-slate-400">
-                  暂无模板，请先创建
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {templates.map((tmpl) => (
-                    <div
-                      key={tmpl.id}
-                      className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">{tmpl.name}</p>
-                        {tmpl.description && (
-                          <p className="text-xs text-slate-400 mt-0.5">{tmpl.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          {tmpl.account_type && (
-                            <span
-                              className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${tmpl.account_type === 'asset' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}
-                            >
-                              {tmpl.account_type === 'asset' ? '资产' : '负债'}
-                            </span>
-                          )}
-                          {tmpl.amount != null && (
-                            <span className="text-xs text-slate-400">默认 ¥{tmpl.amount}</span>
-                          )}
-                          <span className="text-xs text-slate-300">使用 {tmpl.use_count} 次</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => applyTemplate(tmpl)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        >
-                          应用
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTemplateEditId(tmpl.id);
-                            setTemplateForm({
-                              name: tmpl.name,
-                              description: tmpl.description ?? '',
-                              template_type: tmpl.template_type as 'account',
-                              category_id: tmpl.category_id ?? '',
-                              account_type: tmpl.account_type ?? '',
-                              amount: tmpl.amount != null ? String(tmpl.amount) : '',
-                              notes: tmpl.notes ?? '',
-                            });
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                          title="编辑"
-                        >
-                          <IconEdit />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTemplate(tmpl.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          title="删除"
-                        >
-                          <IconTrash />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -1528,12 +1331,6 @@ export default function Accounts() {
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {view === 'calculator' && (
-          <div className="max-w-3xl">
-            <LoanCalculator />
           </div>
         )}
       </div>

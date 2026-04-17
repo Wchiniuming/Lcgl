@@ -1,11 +1,12 @@
 mod db;
 
 use db::{
-    initialize_database, get_schema_version, AccountCategory, Account, Transaction, Holding,
-    Price, Template, Snapshot, Reminder, Setting,
-    AccountType, TransactionType, HoldingType, TemplateType, ReminderType,
+    get_schema_version, initialize_database, Account, AccountCategory, AccountType, Holding,
+    HoldingType, Price, Reminder, ReminderType, Setting, Snapshot, Template, TemplateType,
+    Transaction, TransactionType,
 };
 use rusqlite::Connection;
+use std::str::FromStr;
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -33,29 +34,38 @@ fn get_db_version(state: tauri::State<AppState>) -> Result<i32, String> {
 // =============================================================================
 
 #[tauri::command]
-fn get_all_account_categories(state: tauri::State<AppState>) -> Result<Vec<AccountCategory>, String> {
+fn get_all_account_categories(
+    state: tauri::State<AppState>,
+) -> Result<Vec<AccountCategory>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare(
         "SELECT id, name, parent_id, type, icon, color, sort_order, is_active, created_at, updated_at
          FROM account_categories WHERE is_active = 1 ORDER BY sort_order"
     ).map_err(|e| e.to_string())?;
 
-    let categories = stmt.query_map([], |row| {
-        Ok(AccountCategory {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            parent_id: row.get(2)?,
-            category_type: row.get::<_, String>(3)?.parse().unwrap_or(AccountType::Asset),
-            icon: row.get(4)?,
-            color: row.get(5)?,
-            sort_order: row.get(6)?,
-            is_active: row.get::<_, i32>(7)? == 1,
-            created_at: row.get(8)?,
-            updated_at: row.get(9)?,
+    let categories = stmt
+        .query_map([], |row| {
+            Ok(AccountCategory {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                parent_id: row.get(2)?,
+                category_type: row
+                    .get::<_, String>(3)?
+                    .parse()
+                    .unwrap_or(AccountType::Asset),
+                icon: row.get(4)?,
+                color: row.get(5)?,
+                sort_order: row.get(6)?,
+                is_active: row.get::<_, i32>(7)? == 1,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    categories.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    categories
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -93,28 +103,46 @@ fn update_account_category(
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     if let Some(n) = name {
-        conn.execute("UPDATE account_categories SET name = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![n, now, id]).map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE account_categories SET name = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![n, now, id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(pid) = parent_id {
-        conn.execute("UPDATE account_categories SET parent_id = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![pid, now, id]).map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE account_categories SET parent_id = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![pid, now, id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(ic) = icon {
-        conn.execute("UPDATE account_categories SET icon = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![ic, now, id]).map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE account_categories SET icon = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![ic, now, id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(cl) = color {
-        conn.execute("UPDATE account_categories SET color = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![cl, now, id]).map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE account_categories SET color = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![cl, now, id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(so) = sort_order {
-        conn.execute("UPDATE account_categories SET sort_order = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![so, now, id]).map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE account_categories SET sort_order = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![so, now, id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     if let Some(ia) = is_active {
-        conn.execute("UPDATE account_categories SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
-            rusqlite::params![ia as i32, now, id]).map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE account_categories SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
+            rusqlite::params![ia as i32, now, id],
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -126,7 +154,8 @@ fn delete_account_category(state: tauri::State<AppState>, id: i64) -> Result<(),
     conn.execute(
         "UPDATE account_categories SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -137,56 +166,70 @@ fn delete_account_category(state: tauri::State<AppState>, id: i64) -> Result<(),
 #[tauri::command]
 fn get_all_accounts(state: tauri::State<AppState>) -> Result<Vec<Account>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT id, name, category_id, type, balance, currency, institution, account_no,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, category_id, type, balance, currency, institution, account_no,
                 interest_rate, term_months, start_date, maturity_date, payment_due_day,
                 is_active, is_archived, notes, extra_data, created_at, updated_at
-         FROM accounts WHERE is_active = 1 ORDER BY name"
-    ).map_err(|e| e.to_string())?;
+         FROM accounts WHERE is_active = 1 ORDER BY name",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let accounts = stmt.query_map([], |row| {
-        Ok(Account {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            category_id: row.get(2)?,
-            account_type: row.get::<_, String>(3)?.parse().unwrap_or(AccountType::Asset),
-            balance: row.get(4)?,
-            currency: row.get(5)?,
-            institution: row.get(6)?,
-            account_no: row.get(7)?,
-            interest_rate: row.get(8)?,
-            term_months: row.get(9)?,
-            start_date: row.get(10)?,
-            maturity_date: row.get(11)?,
-            payment_due_day: row.get(12)?,
-            is_active: row.get::<_, i32>(13)? == 1,
-            is_archived: row.get::<_, i32>(14)? == 1,
-            notes: row.get(15)?,
-            extra_data: row.get(16)?,
-            created_at: row.get(17)?,
-            updated_at: row.get(18)?,
+    let accounts = stmt
+        .query_map([], |row| {
+            Ok(Account {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                category_id: row.get(2)?,
+                account_type: row
+                    .get::<_, String>(3)?
+                    .parse()
+                    .unwrap_or(AccountType::Asset),
+                balance: row.get(4)?,
+                currency: row.get(5)?,
+                institution: row.get(6)?,
+                account_no: row.get(7)?,
+                interest_rate: row.get(8)?,
+                term_months: row.get(9)?,
+                start_date: row.get(10)?,
+                maturity_date: row.get(11)?,
+                payment_due_day: row.get(12)?,
+                is_active: row.get::<_, i32>(13)? == 1,
+                is_archived: row.get::<_, i32>(14)? == 1,
+                notes: row.get(15)?,
+                extra_data: row.get(16)?,
+                created_at: row.get(17)?,
+                updated_at: row.get(18)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    accounts.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    accounts
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_account(state: tauri::State<AppState>, id: i64) -> Result<Account, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT id, name, category_id, type, balance, currency, institution, account_no,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, category_id, type, balance, currency, institution, account_no,
                 interest_rate, term_months, start_date, maturity_date, payment_due_day,
                 is_active, is_archived, notes, extra_data, created_at, updated_at
-         FROM accounts WHERE id = ?1"
-    ).map_err(|e| e.to_string())?;
+         FROM accounts WHERE id = ?1",
+        )
+        .map_err(|e| e.to_string())?;
 
     stmt.query_row([id], |row| {
         Ok(Account {
             id: row.get(0)?,
             name: row.get(1)?,
             category_id: row.get(2)?,
-            account_type: row.get::<_, String>(3)?.parse().unwrap_or(AccountType::Asset),
+            account_type: row
+                .get::<_, String>(3)?
+                .parse()
+                .unwrap_or(AccountType::Asset),
             balance: row.get(4)?,
             currency: row.get(5)?,
             institution: row.get(6)?,
@@ -203,7 +246,8 @@ fn get_account(state: tauri::State<AppState>, id: i64) -> Result<Account, String
             created_at: row.get(17)?,
             updated_at: row.get(18)?,
         })
-    }).map_err(|e| e.to_string())
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -246,13 +290,18 @@ fn update_account(state: tauri::State<AppState>, account: Account) -> Result<(),
 }
 
 #[tauri::command]
-fn update_account_balance(state: tauri::State<AppState>, id: i64, balance: f64) -> Result<(), String> {
+fn update_account_balance(
+    state: tauri::State<AppState>,
+    id: i64,
+    balance: f64,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE accounts SET balance = ?1, updated_at = ?2 WHERE id = ?3",
         rusqlite::params![balance, now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -263,7 +312,8 @@ fn delete_account(state: tauri::State<AppState>, id: i64) -> Result<(), String> 
     conn.execute(
         "UPDATE accounts SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -274,7 +324,8 @@ fn archive_account(state: tauri::State<AppState>, id: i64) -> Result<(), String>
     conn.execute(
         "UPDATE accounts SET is_archived = 1, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -297,7 +348,8 @@ fn get_transactions(
     let mut sql = "SELECT id, account_id, transaction_type, amount, balance_after, counterparty_id,
                    transaction_date, description, category_id, template_id, reference_no,
                    attach_path, is_active, created_at, updated_at
-                   FROM transactions WHERE is_active = 1".to_string();
+                   FROM transactions WHERE is_active = 1"
+        .to_string();
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
     if account_id.is_some() {
@@ -327,44 +379,55 @@ fn get_transactions(
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(params_refs.as_slice(), |row| {
-        Ok(Transaction {
-            id: row.get(0)?,
-            account_id: row.get(1)?,
-            transaction_type: row.get::<_, String>(2)?.parse().unwrap_or(TransactionType::Adjustment),
-            amount: row.get(3)?,
-            balance_after: row.get(4)?,
-            counterparty_id: row.get(5)?,
-            transaction_date: row.get(6)?,
-            description: row.get(7)?,
-            category_id: row.get(8)?,
-            template_id: row.get(9)?,
-            reference_no: row.get(10)?,
-            attach_path: row.get(11)?,
-            is_active: row.get::<_, i32>(12)? == 1,
-            created_at: row.get(13)?,
-            updated_at: row.get(14)?,
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(Transaction {
+                id: row.get(0)?,
+                account_id: row.get(1)?,
+                transaction_type: row
+                    .get::<_, String>(2)?
+                    .parse()
+                    .unwrap_or(TransactionType::Adjustment),
+                amount: row.get(3)?,
+                balance_after: row.get(4)?,
+                counterparty_id: row.get(5)?,
+                transaction_date: row.get(6)?,
+                description: row.get(7)?,
+                category_id: row.get(8)?,
+                template_id: row.get(9)?,
+                reference_no: row.get(10)?,
+                attach_path: row.get(11)?,
+                is_active: row.get::<_, i32>(12)? == 1,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_transaction(state: tauri::State<AppState>, id: i64) -> Result<Transaction, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT id, account_id, transaction_type, amount, balance_after, counterparty_id,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, account_id, transaction_type, amount, balance_after, counterparty_id,
                 transaction_date, description, category_id, template_id, reference_no,
                 attach_path, is_active, created_at, updated_at
-         FROM transactions WHERE id = ?1"
-    ).map_err(|e| e.to_string())?;
+         FROM transactions WHERE id = ?1",
+        )
+        .map_err(|e| e.to_string())?;
 
     stmt.query_row([id], |row| {
         Ok(Transaction {
             id: row.get(0)?,
             account_id: row.get(1)?,
-            transaction_type: row.get::<_, String>(2)?.parse().unwrap_or(TransactionType::Adjustment),
+            transaction_type: row
+                .get::<_, String>(2)?
+                .parse()
+                .unwrap_or(TransactionType::Adjustment),
             amount: row.get(3)?,
             balance_after: row.get(4)?,
             counterparty_id: row.get(5)?,
@@ -378,11 +441,15 @@ fn get_transaction(state: tauri::State<AppState>, id: i64) -> Result<Transaction
             created_at: row.get(13)?,
             updated_at: row.get(14)?,
         })
-    }).map_err(|e| e.to_string())
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn create_transaction(state: tauri::State<AppState>, transaction: Transaction) -> Result<i64, String> {
+fn create_transaction(
+    state: tauri::State<AppState>,
+    transaction: Transaction,
+) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -408,13 +475,17 @@ fn create_transaction(state: tauri::State<AppState>, transaction: Transaction) -
     conn.execute(
         "UPDATE accounts SET balance = balance + (?1 * ?2), updated_at = ?3 WHERE id = ?4",
         rusqlite::params![sign * transaction.amount, 1.0, now, transaction.account_id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(conn.last_insert_rowid())
 }
 
 #[tauri::command]
-fn update_transaction(state: tauri::State<AppState>, transaction: Transaction) -> Result<(), String> {
+fn update_transaction(
+    state: tauri::State<AppState>,
+    transaction: Transaction,
+) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
@@ -440,7 +511,8 @@ fn delete_transaction(state: tauri::State<AppState>, id: i64) -> Result<(), Stri
     conn.execute(
         "UPDATE transactions SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -475,7 +547,8 @@ fn batch_create_transactions(
         conn.execute(
             "UPDATE accounts SET balance = balance + (?1 * ?2), updated_at = ?3 WHERE id = ?4",
             rusqlite::params![sign * tx.amount, 1.0, now, tx.account_id],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
 
         ids.push(conn.last_insert_rowid());
     }
@@ -522,63 +595,92 @@ fn get_holdings(
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let rows = if let Some(ht) = holding_type {
-        stmt.query_map([ht], |row| {
-            Ok(Holding {
-                id: row.get(0)?, symbol: row.get(1)?, name: row.get(2)?,
-                holding_type: row.get::<_, String>(3)?.parse().unwrap_or(HoldingType::Other),
-                account_id: row.get(4)?, shares: row.get(5)?, cost_basis: row.get(6)?,
-                avg_cost: row.get(7)?, current_price: row.get(8)?, current_value: row.get(9)?,
-                unrealized_pnl: row.get(10)?, realized_pnl: row.get(11)?, currency: row.get(12)?,
-                risk_level: row.get(13)?, purchase_date: row.get(14)?,
-                last_price_update: row.get(15)?, is_active: row.get::<_, i32>(16)? == 1,
-                is_archived: row.get::<_, i32>(17)? == 1, notes: row.get(18)?,
-                created_at: row.get(19)?, updated_at: row.get(20)?,
-            })
-        }).map_err(|e| e.to_string())?
-    } else {
-        stmt.query_map([], |row| {
-            Ok(Holding {
-                id: row.get(0)?, symbol: row.get(1)?, name: row.get(2)?,
-                holding_type: row.get::<_, String>(3)?.parse().unwrap_or(HoldingType::Other),
-                account_id: row.get(4)?, shares: row.get(5)?, cost_basis: row.get(6)?,
-                avg_cost: row.get(7)?, current_price: row.get(8)?, current_value: row.get(9)?,
-                unrealized_pnl: row.get(10)?, realized_pnl: row.get(11)?, currency: row.get(12)?,
-                risk_level: row.get(13)?, purchase_date: row.get(14)?,
-                last_price_update: row.get(15)?, is_active: row.get::<_, i32>(16)? == 1,
-                is_archived: row.get::<_, i32>(17)? == 1, notes: row.get(18)?,
-                created_at: row.get(19)?, updated_at: row.get(20)?,
-            })
-        }).map_err(|e| e.to_string())?
+let holding_mapper = |row: &rusqlite::Row| -> Result<Holding, String> {
+        Ok(Holding {
+            id: row.get(0)?,
+            symbol: row.get(1)?,
+            name: row.get(2)?,
+            holding_type: row
+                .get::<_, String>(3)?
+                .parse()
+                .unwrap_or(HoldingType::Other),
+            account_id: row.get(4)?,
+            shares: row.get(5)?,
+            cost_basis: row.get(6)?,
+            avg_cost: row.get(7)?,
+            current_price: row.get(8)?,
+            current_value: row.get(9)?,
+            unrealized_pnl: row.get(10)?,
+            realized_pnl: row.get(11)?,
+            currency: row.get(12)?,
+            risk_level: row.get(13)?,
+            purchase_date: row.get(14)?,
+            last_price_update: row.get(15)?,
+            is_active: row.get::<_, i32>(16)? == 1,
+            is_archived: row.get::<_, i32>(17)? == 1,
+            notes: row.get(18)?,
+            created_at: row.get(19)?,
+            updated_at: row.get(20)?,
+        })
     };
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    let rows: Vec<Holding> = if let Some(ht) = holding_type {
+        stmt.query_map([ht], holding_mapper)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_}, _>>()
+            .map_err(|e| e.to_string())?
+    } else {
+        stmt.query_map([], holding_mapper)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_}, _>>()
+            .map_err(|e| e.to_string())?
+    };
+
+    Ok(rows)
 }
 
 #[tauri::command]
 fn get_holding(state: tauri::State<AppState>, id: i64) -> Result<Holding, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT id, symbol, name, holding_type, account_id, shares, cost_basis, avg_cost,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, symbol, name, holding_type, account_id, shares, cost_basis, avg_cost,
                 current_price, current_value, unrealized_pnl, realized_pnl, currency,
                 risk_level, purchase_date, last_price_update, is_active, is_archived,
                 notes, created_at, updated_at
-         FROM holdings WHERE id = ?1"
-    ).map_err(|e| e.to_string())?;
+         FROM holdings WHERE id = ?1",
+        )
+        .map_err(|e| e.to_string())?;
 
     stmt.query_row([id], |row| {
         Ok(Holding {
-            id: row.get(0)?, symbol: row.get(1)?, name: row.get(2)?,
-            holding_type: row.get::<_, String>(3)?.parse().unwrap_or(HoldingType::Other),
-            account_id: row.get(4)?, shares: row.get(5)?, cost_basis: row.get(6)?,
-            avg_cost: row.get(7)?, current_price: row.get(8)?, current_value: row.get(9)?,
-            unrealized_pnl: row.get(10)?, realized_pnl: row.get(11)?, currency: row.get(12)?,
-            risk_level: row.get(13)?, purchase_date: row.get(14)?,
-            last_price_update: row.get(15)?, is_active: row.get::<_, i32>(16)? == 1,
-            is_archived: row.get::<_, i32>(17)? == 1, notes: row.get(18)?,
-            created_at: row.get(19)?, updated_at: row.get(20)?,
+            id: row.get(0)?,
+            symbol: row.get(1)?,
+            name: row.get(2)?,
+            holding_type: row
+                .get::<_, String>(3)?
+                .parse()
+                .unwrap_or(HoldingType::Other),
+            account_id: row.get(4)?,
+            shares: row.get(5)?,
+            cost_basis: row.get(6)?,
+            avg_cost: row.get(7)?,
+            current_price: row.get(8)?,
+            current_value: row.get(9)?,
+            unrealized_pnl: row.get(10)?,
+            realized_pnl: row.get(11)?,
+            currency: row.get(12)?,
+            risk_level: row.get(13)?,
+            purchase_date: row.get(14)?,
+            last_price_update: row.get(15)?,
+            is_active: row.get::<_, i32>(16)? == 1,
+            is_archived: row.get::<_, i32>(17)? == 1,
+            notes: row.get(18)?,
+            created_at: row.get(19)?,
+            updated_at: row.get(20)?,
         })
-    }).map_err(|e| e.to_string())
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -616,15 +718,29 @@ fn update_holding(state: tauri::State<AppState>, holding: Holding) -> Result<(),
                              last_price_update = ?15, is_active = ?16, is_archived = ?17,
                              notes = ?18, updated_at = ?19 WHERE id = ?20",
         rusqlite::params![
-            holding.symbol, holding.name, holding.holding_type.to_string(),
-            holding.account_id, holding.shares, holding.cost_basis, holding.avg_cost,
-            holding.current_price, holding.current_value, holding.unrealized_pnl,
-            holding.realized_pnl, holding.currency, holding.risk_level,
-            holding.purchase_date, holding.last_price_update,
-            holding.is_active as i32, holding.is_archived as i32, holding.notes,
-            now, holding.id
+            holding.symbol,
+            holding.name,
+            holding.holding_type.to_string(),
+            holding.account_id,
+            holding.shares,
+            holding.cost_basis,
+            holding.avg_cost,
+            holding.current_price,
+            holding.current_value,
+            holding.unrealized_pnl,
+            holding.realized_pnl,
+            holding.currency,
+            holding.risk_level,
+            holding.purchase_date,
+            holding.last_price_update,
+            holding.is_active as i32,
+            holding.is_archived as i32,
+            holding.notes,
+            now,
+            holding.id
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -635,7 +751,8 @@ fn delete_holding(state: tauri::State<AppState>, id: i64) -> Result<(), String> 
     conn.execute(
         "UPDATE holdings SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -646,7 +763,8 @@ fn archive_holding(state: tauri::State<AppState>, id: i64) -> Result<(), String>
     conn.execute(
         "UPDATE holdings SET is_archived = 1, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -666,7 +784,8 @@ fn batch_update_holding_prices(
                                  last_price_update = ?2, updated_at = ?2
              WHERE symbol = ?3 AND is_active = 1",
             rusqlite::params![price, now, symbol],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -686,7 +805,8 @@ fn get_prices(
     let conn = state.db.lock().map_err(|e| e.to_string())?;
 
     let mut sql = "SELECT id, symbol, price, price_date, change_percent, volume, source, created_at
-                   FROM prices WHERE symbol = ?1".to_string();
+                   FROM prices WHERE symbol = ?1"
+        .to_string();
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(symbol)];
 
     if start_date.is_some() {
@@ -705,20 +825,23 @@ fn get_prices(
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(params_refs.as_slice(), |row| {
-        Ok(Price {
-            id: row.get(0)?,
-            symbol: row.get(1)?,
-            price: row.get(2)?,
-            price_date: row.get(3)?,
-            change_percent: row.get(4)?,
-            volume: row.get(5)?,
-            source: row.get(6)?,
-            created_at: row.get(7)?,
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(Price {
+                id: row.get(0)?,
+                symbol: row.get(1)?,
+                price: row.get(2)?,
+                price_date: row.get(3)?,
+                change_percent: row.get(4)?,
+                volume: row.get(5)?,
+                source: row.get(6)?,
+                created_at: row.get(7)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -728,15 +851,23 @@ fn create_price(state: tauri::State<AppState>, price: Price) -> Result<i64, Stri
         "INSERT OR REPLACE INTO prices (symbol, price, price_date, change_percent, volume, source)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         rusqlite::params![
-            price.symbol, price.price, price.price_date,
-            price.change_percent, price.volume, price.source
+            price.symbol,
+            price.price,
+            price.price_date,
+            price.change_percent,
+            price.volume,
+            price.source
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
 }
 
 #[tauri::command]
-fn batch_create_prices(state: tauri::State<AppState>, prices: Vec<Price>) -> Result<Vec<i64>, String> {
+fn batch_create_prices(
+    state: tauri::State<AppState>,
+    prices: Vec<Price>,
+) -> Result<Vec<i64>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let mut ids = Vec::new();
     for p in prices {
@@ -778,35 +909,43 @@ fn get_templates(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
-    let rows = if let Some(tt) = template_type {
-        stmt.query_map([tt], |row| {
-            let tt_str: Option<String> = row.get(6)?;
-            let tt_enum = tt_str.map(|s| TransactionType::from_str(&s).unwrap_or(TransactionType::Income));
-            Ok(Template {
-                id: row.get(0)?, name: row.get(1)?, description: row.get(2)?,
-                template_type: TemplateType::from_str(&row.get::<_, String>(3)?).unwrap_or(TemplateType::Transaction),
-                category_id: row.get(4)?, account_type: row.get(5)?, transaction_type: tt_enum,
-                amount: row.get(7)?, counterparty_id: row.get(8)?, notes: row.get(9)?,
-                is_active: row.get::<_, i32>(10)? == 1, use_count: row.get(11)?,
-                last_used_at: row.get(12)?, created_at: row.get(13)?, updated_at: row.get(14)?,
-            })
-        }).map_err(|e| e.to_string())?
-    } else {
-        stmt.query_map([], |row| {
-            let tt_str: Option<String> = row.get(6)?;
-            let tt_enum = tt_str.map(|s| TransactionType::from_str(&s).unwrap_or(TransactionType::Income));
-            Ok(Template {
-                id: row.get(0)?, name: row.get(1)?, description: row.get(2)?,
-                template_type: TemplateType::from_str(&row.get::<_, String>(3)?).unwrap_or(TemplateType::Transaction),
-                category_id: row.get(4)?, account_type: row.get(5)?, transaction_type: tt_enum,
-                amount: row.get(7)?, counterparty_id: row.get(8)?, notes: row.get(9)?,
-                is_active: row.get::<_, i32>(10)? == 1, use_count: row.get(11)?,
-                last_used_at: row.get(12)?, created_at: row.get(13)?, updated_at: row.get(14)?,
-            })
-        }).map_err(|e| e.to_string())?
+    let template_mapper = |row: &rusqlite::Row| -> Result<Template, String> {
+        let tt_str: Option<String> = row.get(6)?;
+        let tt_enum =
+            tt_str.map(|s| TransactionType::from_str(&s).unwrap_or(TransactionType::Income));
+        Ok(Template {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            template_type: TemplateType::from_str(&row.get::<_, String>(3)?)
+                .unwrap_or(TemplateType::Transaction),
+            category_id: row.get(4)?,
+            account_type: row.get(5)?,
+            transaction_type: tt_enum,
+            amount: row.get(7)?,
+            counterparty_id: row.get(8)?,
+            notes: row.get(9)?,
+            is_active: row.get::<_, i32>(10)? == 1,
+            use_count: row.get(11)?,
+            last_used_at: row.get(12)?,
+            created_at: row.get(13)?,
+            updated_at: row.get(14)?,
+        })
     };
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    let rows: Vec<Template> = if let Some(tt) = template_type {
+        stmt.query_map([tt], template_mapper)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_}, _>>()
+            .map_err(|e| e.to_string())?
+    } else {
+        stmt.query_map([], template_mapper)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_}, _>>()
+            .map_err(|e| e.to_string())?
+    };
+
+    Ok(rows)
 }
 
 #[tauri::command]
@@ -819,13 +958,19 @@ fn create_template(state: tauri::State<AppState>, template: Template) -> Result<
                                  use_count, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, 0, ?10, ?10)",
         rusqlite::params![
-            template.name, template.description, template.template_type.to_string(),
-            template.category_id, template.account_type,
+            template.name,
+            template.description,
+            template.template_type.to_string(),
+            template.category_id,
+            template.account_type,
             template.transaction_type.map(|t| t.to_string()),
-            template.amount, template.counterparty_id, template.notes,
+            template.amount,
+            template.counterparty_id,
+            template.notes,
             now
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
 }
 
@@ -839,13 +984,21 @@ fn update_template(state: tauri::State<AppState>, template: Template) -> Result<
                                counterparty_id = ?8, notes = ?9, is_active = ?10, updated_at = ?11
          WHERE id = ?12",
         rusqlite::params![
-            template.name, template.description, template.template_type.to_string(),
-            template.category_id, template.account_type,
+            template.name,
+            template.description,
+            template.template_type.to_string(),
+            template.category_id,
+            template.account_type,
             template.transaction_type.map(|t| t.to_string()),
-            template.amount, template.counterparty_id, template.notes,
-            template.is_active as i32, now, template.id
+            template.amount,
+            template.counterparty_id,
+            template.notes,
+            template.is_active as i32,
+            now,
+            template.id
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -856,7 +1009,8 @@ fn delete_template(state: tauri::State<AppState>, id: i64) -> Result<(), String>
     conn.execute(
         "UPDATE templates SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -895,49 +1049,66 @@ fn get_snapshots(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
-    let rows = if let Some(st) = snapshot_type {
-        stmt.query_map([st], |row| {
-            Ok(Snapshot {
-                id: row.get(0)?, snapshot_date: row.get(1)?, snapshot_type: row.get(2)?,
-                total_assets: row.get(3)?, total_liabilities: row.get(4)?, net_assets: row.get(5)?,
-                asset_breakdown: row.get(6)?, liability_breakdown: row.get(7)?,
-                holdings_value: row.get(8)?, cash_flow: row.get(9)?, notes: row.get(10)?,
-                created_at: row.get(11)?,
-            })
-        }).map_err(|e| e.to_string())?
-    } else {
-        stmt.query_map([], |row| {
-            Ok(Snapshot {
-                id: row.get(0)?, snapshot_date: row.get(1)?, snapshot_type: row.get(2)?,
-                total_assets: row.get(3)?, total_liabilities: row.get(4)?, net_assets: row.get(5)?,
-                asset_breakdown: row.get(6)?, liability_breakdown: row.get(7)?,
-                holdings_value: row.get(8)?, cash_flow: row.get(9)?, notes: row.get(10)?,
-                created_at: row.get(11)?,
-            })
-        }).map_err(|e| e.to_string())?
+    let snapshot_mapper = |row: &rusqlite::Row| -> Result<Snapshot, String> {
+        Ok(Snapshot {
+            id: row.get(0)?,
+            snapshot_date: row.get(1)?,
+            snapshot_type: row.get(2)?,
+            total_assets: row.get(3)?,
+            total_liabilities: row.get(4)?,
+            net_assets: row.get(5)?,
+            asset_breakdown: row.get(6)?,
+            liability_breakdown: row.get(7)?,
+            holdings_value: row.get(8)?,
+            cash_flow: row.get(9)?,
+            notes: row.get(10)?,
+            created_at: row.get(11)?,
+        })
     };
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    let rows: Vec<Snapshot> = if let Some(st) = snapshot_type {
+        stmt.query_map([st], snapshot_mapper)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_}, _>>()
+            .map_err(|e| e.to_string())?
+    } else {
+        stmt.query_map([], snapshot_mapper)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_}, _>>()
+            .map_err(|e| e.to_string())?
+    };
+
+    Ok(rows)
 }
 
 #[tauri::command]
 fn get_snapshot(state: tauri::State<AppState>, id: i64) -> Result<Snapshot, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT id, snapshot_date, snapshot_type, total_assets, total_liabilities, net_assets,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, snapshot_date, snapshot_type, total_assets, total_liabilities, net_assets,
                 asset_breakdown, liability_breakdown, holdings_value, cash_flow, notes, created_at
-         FROM snapshots WHERE id = ?1"
-    ).map_err(|e| e.to_string())?;
+         FROM snapshots WHERE id = ?1",
+        )
+        .map_err(|e| e.to_string())?;
 
     stmt.query_row([id], |row| {
         Ok(Snapshot {
-            id: row.get(0)?, snapshot_date: row.get(1)?, snapshot_type: row.get(2)?,
-            total_assets: row.get(3)?, total_liabilities: row.get(4)?, net_assets: row.get(5)?,
-            asset_breakdown: row.get(6)?, liability_breakdown: row.get(7)?,
-            holdings_value: row.get(8)?, cash_flow: row.get(9)?, notes: row.get(10)?,
+            id: row.get(0)?,
+            snapshot_date: row.get(1)?,
+            snapshot_type: row.get(2)?,
+            total_assets: row.get(3)?,
+            total_liabilities: row.get(4)?,
+            net_assets: row.get(5)?,
+            asset_breakdown: row.get(6)?,
+            liability_breakdown: row.get(7)?,
+            holdings_value: row.get(8)?,
+            cash_flow: row.get(9)?,
+            notes: row.get(10)?,
             created_at: row.get(11)?,
         })
-    }).map_err(|e| e.to_string())
+    })
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -949,12 +1120,19 @@ fn create_snapshot(state: tauri::State<AppState>, snapshot: Snapshot) -> Result<
                                  cash_flow, notes)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         rusqlite::params![
-            snapshot.snapshot_date, snapshot.snapshot_type,
-            snapshot.total_assets, snapshot.total_liabilities, snapshot.net_assets,
-            snapshot.asset_breakdown, snapshot.liability_breakdown,
-            snapshot.holdings_value, snapshot.cash_flow, snapshot.notes
+            snapshot.snapshot_date,
+            snapshot.snapshot_type,
+            snapshot.total_assets,
+            snapshot.total_liabilities,
+            snapshot.net_assets,
+            snapshot.asset_breakdown,
+            snapshot.liability_breakdown,
+            snapshot.holdings_value,
+            snapshot.cash_flow,
+            snapshot.notes
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
 }
 
@@ -972,20 +1150,26 @@ fn create_auto_snapshot(state: tauri::State<AppState>) -> Result<i64, String> {
     let now = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
     // Calculate totals
-    let total_assets: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE type = 'asset' AND is_active = 1",
-        [], |row| row.get(0)
-    ).unwrap_or(0.0);
+    let total_assets: f64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE type = 'asset' AND is_active = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
     let total_liabilities: f64 = conn.query_row(
         "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE type = 'liability' AND is_active = 1",
         [], |row| row.get(0)
     ).unwrap_or(0.0);
 
-    let holdings_value: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(current_value), 0) FROM holdings WHERE is_active = 1",
-        [], |row| row.get(0)
-    ).unwrap_or(0.0);
+    let holdings_value: f64 = conn
+        .query_row(
+            "SELECT COALESCE(SUM(current_value), 0) FROM holdings WHERE is_active = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
     let net_assets = total_assets - total_liabilities;
 
@@ -993,8 +1177,15 @@ fn create_auto_snapshot(state: tauri::State<AppState>) -> Result<i64, String> {
         "INSERT INTO snapshots (snapshot_date, snapshot_type, total_assets, total_liabilities,
                                  net_assets, holdings_value)
          VALUES (?1, 'auto', ?2, ?3, ?4, ?5)",
-        rusqlite::params![now, total_assets, total_liabilities, net_assets, holdings_value],
-    ).map_err(|e| e.to_string())?;
+        rusqlite::params![
+            now,
+            total_assets,
+            total_liabilities,
+            net_assets,
+            holdings_value
+        ],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
 }
 
@@ -1014,7 +1205,8 @@ fn get_reminders(
     let mut sql = "SELECT id, title, reminder_type, account_id, holding_id, target_date,
                    advance_days, is_repeating, repeat_interval, repeat_unit, is_active,
                    is_completed, completed_at, notes, created_at, updated_at
-                   FROM reminders WHERE 1=1".to_string();
+                   FROM reminders WHERE 1=1"
+        .to_string();
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
     if let Some(rt) = reminder_type {
@@ -1033,20 +1225,32 @@ fn get_reminders(
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(params_refs.as_slice(), |row| {
-        Ok(Reminder {
-            id: row.get(0)?, title: row.get(1)?,
-            reminder_type: ReminderType::from_str(&row.get::<_, String>(2)?).unwrap_or(ReminderType::Custom),
-            account_id: row.get(3)?, holding_id: row.get(4)?, target_date: row.get(5)?,
-            advance_days: row.get(6)?, is_repeating: row.get::<_, i32>(7)? == 1,
-            repeat_interval: row.get(8)?, repeat_unit: row.get(9)?,
-            is_active: row.get::<_, i32>(10)? == 1,
-            is_completed: row.get::<_, i32>(11)? == 1, completed_at: row.get(12)?,
-            notes: row.get(13)?, created_at: row.get(14)?, updated_at: row.get(15)?,
+    let rows = stmt
+        .query_map(params_refs.as_slice(), |row| {
+            Ok(Reminder {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                reminder_type: ReminderType::from_str(&row.get::<_, String>(2)?)
+                    .unwrap_or(ReminderType::Custom),
+                account_id: row.get(3)?,
+                holding_id: row.get(4)?,
+                target_date: row.get(5)?,
+                advance_days: row.get(6)?,
+                is_repeating: row.get::<_, i32>(7)? == 1,
+                repeat_interval: row.get(8)?,
+                repeat_unit: row.get(9)?,
+                is_active: row.get::<_, i32>(10)? == 1,
+                is_completed: row.get::<_, i32>(11)? == 1,
+                completed_at: row.get(12)?,
+                notes: row.get(13)?,
+                created_at: row.get(14)?,
+                updated_at: row.get(15)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1059,31 +1263,45 @@ fn get_pending_reminders(state: tauri::State<AppState>) -> Result<Vec<Reminder>,
         .format("%Y-%m-%d")
         .to_string();
 
-    let mut stmt = conn.prepare(
-        "SELECT id, title, reminder_type, account_id, holding_id, target_date,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, reminder_type, account_id, holding_id, target_date,
                 advance_days, is_repeating, repeat_interval, repeat_unit, is_active,
                 is_completed, completed_at, notes, created_at, updated_at
          FROM reminders
          WHERE is_active = 1 AND is_completed = 0
            AND date(target_date, '-' || advance_days || ' days') <= ?1
            AND target_date <= ?2
-         ORDER BY target_date ASC"
-    ).map_err(|e| e.to_string())?;
+         ORDER BY target_date ASC",
+        )
+        .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([&now, &future], |row| {
-        Ok(Reminder {
-            id: row.get(0)?, title: row.get(1)?,
-            reminder_type: ReminderType::from_str(&row.get::<_, String>(2)?).unwrap_or(ReminderType::Custom),
-            account_id: row.get(3)?, holding_id: row.get(4)?, target_date: row.get(5)?,
-            advance_days: row.get(6)?, is_repeating: row.get::<_, i32>(7)? == 1,
-            repeat_interval: row.get(8)?, repeat_unit: row.get(9)?,
-            is_active: row.get::<_, i32>(10)? == 1,
-            is_completed: row.get::<_, i32>(11)? == 1, completed_at: row.get(12)?,
-            notes: row.get(13)?, created_at: row.get(14)?, updated_at: row.get(15)?,
+    let rows = stmt
+        .query_map([&now, &future], |row| {
+            Ok(Reminder {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                reminder_type: ReminderType::from_str(&row.get::<_, String>(2)?)
+                    .unwrap_or(ReminderType::Custom),
+                account_id: row.get(3)?,
+                holding_id: row.get(4)?,
+                target_date: row.get(5)?,
+                advance_days: row.get(6)?,
+                is_repeating: row.get::<_, i32>(7)? == 1,
+                repeat_interval: row.get(8)?,
+                repeat_unit: row.get(9)?,
+                is_active: row.get::<_, i32>(10)? == 1,
+                is_completed: row.get::<_, i32>(11)? == 1,
+                completed_at: row.get(12)?,
+                notes: row.get(13)?,
+                created_at: row.get(14)?,
+                updated_at: row.get(15)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1096,13 +1314,20 @@ fn create_reminder(state: tauri::State<AppState>, reminder: Reminder) -> Result<
                                 is_active, is_completed, notes, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, 0, ?10, ?11, ?11)",
         rusqlite::params![
-            reminder.title, reminder.reminder_type.to_string(),
-            reminder.account_id, reminder.holding_id, reminder.target_date,
-            reminder.advance_days, reminder.is_repeating as i32,
-            reminder.repeat_interval, reminder.repeat_unit, reminder.notes,
+            reminder.title,
+            reminder.reminder_type.to_string(),
+            reminder.account_id,
+            reminder.holding_id,
+            reminder.target_date,
+            reminder.advance_days,
+            reminder.is_repeating as i32,
+            reminder.repeat_interval,
+            reminder.repeat_unit,
+            reminder.notes,
             now
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
 }
 
@@ -1116,13 +1341,22 @@ fn update_reminder(state: tauri::State<AppState>, reminder: Reminder) -> Result<
                                repeat_interval = ?8, repeat_unit = ?9, is_active = ?10,
                                notes = ?11, updated_at = ?12 WHERE id = ?13",
         rusqlite::params![
-            reminder.title, reminder.reminder_type.to_string(),
-            reminder.account_id, reminder.holding_id, reminder.target_date,
-            reminder.advance_days, reminder.is_repeating as i32,
-            reminder.repeat_interval, reminder.repeat_unit,
-            reminder.is_active as i32, reminder.notes, now, reminder.id
+            reminder.title,
+            reminder.reminder_type.to_string(),
+            reminder.account_id,
+            reminder.holding_id,
+            reminder.target_date,
+            reminder.advance_days,
+            reminder.is_repeating as i32,
+            reminder.repeat_interval,
+            reminder.repeat_unit,
+            reminder.is_active as i32,
+            reminder.notes,
+            now,
+            reminder.id
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1133,7 +1367,8 @@ fn delete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), String>
     conn.execute(
         "UPDATE reminders SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1143,26 +1378,41 @@ fn complete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), Strin
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Check if it's repeating, if so schedule next occurrence
-    let is_repeating: bool = conn.query_row(
-        "SELECT is_repeating FROM reminders WHERE id = ?1",
-        [id], |row| Ok(row.get::<_, i32>(0)? == 1)
-    ).map_err(|e| e.to_string())?;
+    let is_repeating: bool = conn
+        .query_row(
+            "SELECT is_repeating FROM reminders WHERE id = ?1",
+            [id],
+            |row| Ok(row.get::<_, i32>(0)? == 1),
+        )
+        .map_err(|e| e.to_string())?;
 
     if is_repeating {
-        let repeat_interval: i32 = conn.query_row(
-            "SELECT repeat_interval FROM reminders WHERE id = ?1",
-            [id], |row| row.get::<_, Option<i32>>(0)
-        ).map_err(|e| e.to_string())?.unwrap_or(30);
-        let repeat_unit: String = conn.query_row(
-            "SELECT repeat_unit FROM reminders WHERE id = ?1",
-            [id], |row| row.get::<_, Option<String>>(0)
-        ).map_err(|e| e.to_string())?.unwrap_or_else(|| "day".to_string());
+        let repeat_interval: i32 = conn
+            .query_row(
+                "SELECT repeat_interval FROM reminders WHERE id = ?1",
+                [id],
+                |row| row.get::<_, Option<i32>>(0),
+            )
+            .map_err(|e| e.to_string())?
+            .unwrap_or(30);
+        let repeat_unit: String = conn
+            .query_row(
+                "SELECT repeat_unit FROM reminders WHERE id = ?1",
+                [id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| "day".to_string());
 
         let next_date = match repeat_unit.as_str() {
-            "day" => chrono::Utc::now().checked_add_signed(chrono::Duration::days(repeat_interval as i64)),
-            "week" => chrono::Utc::now().checked_add_signed(chrono::Duration::weeks(repeat_interval as i64)),
-            "month" => chrono::Utc::now().checked_add_signed(chrono::Duration::days((repeat_interval as i64) * 30)),
-            "year" => chrono::Utc::now().checked_add_signed(chrono::Duration::days((repeat_interval as i64) * 365)),
+            "day" => chrono::Utc::now()
+                .checked_add_signed(chrono::Duration::days(repeat_interval as i64)),
+            "week" => chrono::Utc::now()
+                .checked_add_signed(chrono::Duration::weeks(repeat_interval as i64)),
+            "month" => chrono::Utc::now()
+                .checked_add_signed(chrono::Duration::days((repeat_interval as i64) * 30)),
+            "year" => chrono::Utc::now()
+                .checked_add_signed(chrono::Duration::days((repeat_interval as i64) * 365)),
             _ => None,
         };
 
@@ -1188,21 +1438,24 @@ fn complete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), Strin
 #[tauri::command]
 fn get_settings(state: tauri::State<AppState>) -> Result<Vec<Setting>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT key, value, value_type, description, updated_at FROM settings"
-    ).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT key, value, value_type, description, updated_at FROM settings")
+        .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(Setting {
-            key: row.get(0)?,
-            value: row.get(1)?,
-            value_type: row.get(2)?,
-            description: row.get(3)?,
-            updated_at: row.get(4)?,
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(Setting {
+                key: row.get(0)?,
+                value: row.get(1)?,
+                value_type: row.get(2)?,
+                description: row.get(3)?,
+                updated_at: row.get(4)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
-    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1242,7 +1495,8 @@ fn set_setting(
         "INSERT OR REPLACE INTO settings (key, value, value_type, description, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         rusqlite::params![key, value, value_type, description, now],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1306,18 +1560,21 @@ fn set_password(state: tauri::State<AppState>, password: String) -> Result<(), S
         "INSERT OR REPLACE INTO settings (key, value, value_type, description, updated_at)
          VALUES ('app_password', ?1, 'string', '应用程序密码', ?2)",
         rusqlite::params![hash, now],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
 fn has_password(state: tauri::State<AppState>) -> Result<bool, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let count: i32 = conn.query_row(
-        "SELECT COUNT(*) FROM settings WHERE key = 'app_password'",
-        [],
-        |row| row.get(0),
-    ).map_err(|e| e.to_string())?;
+    let count: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM settings WHERE key = 'app_password'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
     Ok(count > 0)
 }
 
@@ -1383,9 +1640,7 @@ fn cleanup_old_backups(app: &tauri::AppHandle, max_count: i32) -> Result<(), Str
     let mut entries: Vec<_> = std::fs::read_dir(&backup_dir)
         .map_err(|e| e.to_string())?
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name().to_string_lossy().starts_with("lcgl_backup_")
-        })
+        .filter(|e| e.file_name().to_string_lossy().starts_with("lcgl_backup_"))
         .collect();
     entries.sort_by_key(|e| std::cmp::Reverse(e.metadata().and_then(|m| m.created()).ok()));
 
@@ -1403,9 +1658,7 @@ fn list_backups(app: tauri::AppHandle) -> Result<Vec<BackupInfo>, String> {
     let entries: Vec<BackupInfo> = std::fs::read_dir(&backup_dir)
         .map_err(|e| e.to_string())?
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name().to_string_lossy().starts_with("lcgl_backup_")
-        })
+        .filter(|e| e.file_name().to_string_lossy().starts_with("lcgl_backup_"))
         .filter_map(|e| {
             let metadata = e.metadata().ok()?;
             let created_at = metadata
@@ -1459,9 +1712,16 @@ fn get_auto_backup_config(app: tauri::AppHandle) -> Result<(bool, i32), String> 
     let config_path = app_data_dir.join("backup_config.json");
     if config_path.exists() {
         let content = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
-        let config: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-        let enabled = config.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
-        let max_count = config.get("max_count").and_then(|v| v.as_i64()).unwrap_or(10) as i32;
+        let config: serde_json::Value =
+            serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        let enabled = config
+            .get("enabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let max_count = config
+            .get("max_count")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(10) as i32;
         Ok((enabled, max_count))
     } else {
         Ok((false, 10))
@@ -1469,7 +1729,11 @@ fn get_auto_backup_config(app: tauri::AppHandle) -> Result<(bool, i32), String> 
 }
 
 #[tauri::command]
-fn set_auto_backup_config(app: tauri::AppHandle, enabled: bool, max_count: i32) -> Result<(), String> {
+fn set_auto_backup_config(
+    app: tauri::AppHandle,
+    enabled: bool,
+    max_count: i32,
+) -> Result<(), String> {
     let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
     let config_path = app_data_dir.join("backup_config.json");
@@ -1477,8 +1741,11 @@ fn set_auto_backup_config(app: tauri::AppHandle, enabled: bool, max_count: i32) 
         "enabled": enabled,
         "max_count": max_count
     });
-    std::fs::write(&config_path, serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    std::fs::write(
+        &config_path,
+        serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1492,17 +1759,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            let app_data_dir = app.path().app_data_dir()
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
                 .expect("Failed to get app data directory");
 
-            std::fs::create_dir_all(&app_data_dir)
-                .expect("Failed to create app data directory");
+            std::fs::create_dir_all(&app_data_dir).expect("Failed to create app data directory");
 
             let db_path = app_data_dir.join("lcgl.db");
             println!("Database path: {:?}", db_path);
 
-            let conn = initialize_database(&db_path)
-                .expect("Failed to initialize database");
+            let conn = initialize_database(&db_path).expect("Failed to initialize database");
 
             app.manage(AppState {
                 db: Mutex::new(conn),

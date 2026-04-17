@@ -1,5 +1,5 @@
 use chrono::{DateTime, NaiveDate, Utc};
-use rusqlite::{params, FromSql, Row, ToSql};
+use rusqlite::{FromSql, Row, ToSql};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -51,7 +51,8 @@ impl AccountCategory {
             id: row.get(0)?,
             name: row.get(1)?,
             parent_id: row.get(2)?,
-            category_type: AccountType::from_str(&row.get::<_, String>(3)?).unwrap_or(AccountType::Asset),
+            category_type: AccountType::from_str(&row.get::<_, String>(3)?)
+                .unwrap_or(AccountType::Asset),
             icon: row.get(4)?,
             color: row.get(5)?,
             sort_order: row.get(6)?,
@@ -92,7 +93,8 @@ impl Account {
             id: row.get(0)?,
             name: row.get(1)?,
             category_id: row.get(2)?,
-            account_type: AccountType::from_str(&row.get::<_, String>(3)?).unwrap_or(AccountType::Asset),
+            account_type: AccountType::from_str(&row.get::<_, String>(3)?)
+                .unwrap_or(AccountType::Asset),
             balance: row.get(4)?,
             currency: row.get(5)?,
             institution: row.get(6)?,
@@ -169,7 +171,8 @@ impl Transaction {
         Ok(Transaction {
             id: row.get(0)?,
             account_id: row.get(1)?,
-            transaction_type: TransactionType::from_str(&row.get::<_, String>(2)?).unwrap_or(TransactionType::Adjustment),
+            transaction_type: TransactionType::from_str(&row.get::<_, String>(2)?)
+                .unwrap_or(TransactionType::Adjustment),
             amount: row.get(3)?,
             balance_after: row.get(4)?,
             counterparty_id: row.get(5)?,
@@ -256,7 +259,8 @@ impl Holding {
             id: row.get(0)?,
             symbol: row.get(1)?,
             name: row.get(2)?,
-            holding_type: HoldingType::from_str(&row.get::<_, String>(3)?).unwrap_or(HoldingType::Other),
+            holding_type: HoldingType::from_str(&row.get::<_, String>(3)?)
+                .unwrap_or(HoldingType::Other),
             account_id: row.get(4)?,
             shares: row.get(5)?,
             cost_basis: row.get(6)?,
@@ -354,7 +358,8 @@ impl Template {
             id: row.get(0)?,
             name: row.get(1)?,
             description: row.get(2)?,
-            template_type: TemplateType::from_str(&row.get::<_, String>(3)?).unwrap_or(TemplateType::Transaction),
+            template_type: TemplateType::from_str(&row.get::<_, String>(3)?)
+                .unwrap_or(TemplateType::Transaction),
             category_id: row.get(4)?,
             account_type: row.get(5)?,
             transaction_type,
@@ -466,7 +471,8 @@ impl Reminder {
         Ok(Reminder {
             id: row.get(0)?,
             title: row.get(1)?,
-            reminder_type: ReminderType::from_str(&row.get::<_, String>(2)?).unwrap_or(ReminderType::Custom),
+            reminder_type: ReminderType::from_str(&row.get::<_, String>(2)?)
+                .unwrap_or(ReminderType::Custom),
             account_id: row.get(3)?,
             holding_id: row.get(4)?,
             target_date: row.get(5)?,
