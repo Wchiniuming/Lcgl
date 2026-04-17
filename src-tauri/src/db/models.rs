@@ -359,7 +359,7 @@ pub struct Template {
 
 impl Template {
     pub fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        let transaction_type_str: Option<String> = row.get(10)?;
+        let transaction_type_str: Option<String> = row.get(6)?;
         let transaction_type = transaction_type_str
             .map(|s| TransactionType::from_str(&s).unwrap_or(TransactionType::Income));
 
@@ -372,10 +372,10 @@ impl Template {
             category_id: row.get(4)?,
             account_type: row.get(5)?,
             transaction_type,
-            amount: row.get(6)?,
-            counterparty_id: row.get(7)?,
-            notes: row.get(8)?,
-            is_active: row.get::<_, i32>(9)? == 1,
+            amount: row.get(7)?,
+            counterparty_id: row.get(8)?,
+            notes: row.get(9)?,
+            is_active: row.get::<_, i32>(10)? == 1,
             use_count: row.get(11)?,
             last_used_at: row.get(12)?,
             created_at: row.get(13)?,
@@ -465,6 +465,7 @@ pub struct Reminder {
     pub reminder_type: ReminderType,
     pub account_id: Option<i64>,
     pub holding_id: Option<i64>,
+    pub related_id: Option<i64>,
     pub target_date: String,
     pub advance_days: i32,
     pub is_repeating: bool,
@@ -487,17 +488,18 @@ impl Reminder {
                 .unwrap_or(ReminderType::Custom),
             account_id: row.get(3)?,
             holding_id: row.get(4)?,
-            target_date: row.get(5)?,
-            advance_days: row.get(6)?,
-            is_repeating: row.get::<_, i32>(7)? == 1,
-            repeat_interval: row.get(8)?,
-            repeat_unit: row.get(9)?,
-            is_active: row.get::<_, i32>(10)? == 1,
-            is_completed: row.get::<_, i32>(11)? == 1,
-            completed_at: row.get(12)?,
-            notes: row.get(13)?,
-            created_at: row.get(14)?,
-            updated_at: row.get(15)?,
+            related_id: row.get(5)?,
+            target_date: row.get(6)?,
+            advance_days: row.get(7)?,
+            is_repeating: row.get::<_, i32>(8)? == 1,
+            repeat_interval: row.get(9)?,
+            repeat_unit: row.get(10)?,
+            is_active: row.get::<_, i32>(11)? == 1,
+            is_completed: row.get::<_, i32>(12)? == 1,
+            completed_at: row.get(13)?,
+            notes: row.get(14)?,
+            created_at: row.get(15)?,
+            updated_at: row.get(16)?,
         })
     }
 }

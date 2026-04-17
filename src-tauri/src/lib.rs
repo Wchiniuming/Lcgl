@@ -1,5 +1,6 @@
 mod db;
 
+use chrono::{Duration, NaiveDate, Utc};
 use db::{
     get_schema_version, initialize_database, Account, AccountCategory, AccountType, Holding,
     HoldingType, Insurance, Price, Reminder, ReminderType, Setting, Snapshot, Template,
@@ -79,7 +80,7 @@ fn create_account_category(
     sort_order: Option<i32>,
 ) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "INSERT INTO account_categories (name, parent_id, type, icon, color, sort_order, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -100,7 +101,7 @@ fn update_account_category(
     is_active: Option<bool>,
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     if let Some(n) = name {
         conn.execute(
@@ -150,7 +151,7 @@ fn update_account_category(
 #[tauri::command]
 fn delete_account_category(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE account_categories SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -271,7 +272,7 @@ fn create_account(state: tauri::State<AppState>, account: Account) -> Result<i64
 #[tauri::command]
 fn update_account(state: tauri::State<AppState>, account: Account) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE accounts SET name = ?1, category_id = ?2, type = ?3, balance = ?4, currency = ?5,
                              institution = ?6, account_no = ?7, interest_rate = ?8, term_months = ?9,
@@ -296,7 +297,7 @@ fn update_account_balance(
     balance: f64,
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE accounts SET balance = ?1, updated_at = ?2 WHERE id = ?3",
         rusqlite::params![balance, now, id],
@@ -308,7 +309,7 @@ fn update_account_balance(
 #[tauri::command]
 fn delete_account(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE accounts SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -320,7 +321,7 @@ fn delete_account(state: tauri::State<AppState>, id: i64) -> Result<(), String> 
 #[tauri::command]
 fn archive_account(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE accounts SET is_archived = 1, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -451,7 +452,7 @@ fn create_transaction(
     transaction: Transaction,
 ) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "INSERT INTO transactions (account_id, transaction_type, amount, balance_after, counterparty_id,
@@ -487,7 +488,7 @@ fn update_transaction(
     transaction: Transaction,
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE transactions SET account_id = ?1, transaction_type = ?2, amount = ?3, balance_after = ?4,
                                  counterparty_id = ?5, transaction_date = ?6, description = ?7,
@@ -507,7 +508,7 @@ fn update_transaction(
 #[tauri::command]
 fn delete_transaction(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE transactions SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -522,7 +523,7 @@ fn batch_create_transactions(
     transactions: Vec<Transaction>,
 ) -> Result<Vec<i64>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut ids = Vec::new();
 
     for tx in transactions {
@@ -595,49 +596,45 @@ fn get_holdings(
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let holding_mapper = |row: &rusqlite::Row| -> Result<Holding, String> {
+    let holding_mapper = |row: &rusqlite::Row| -> rusqlite::Result<Holding> {
+        let ht_str: String = row.get(3)?;
+        let holding_type = HoldingType::from_str(&ht_str).unwrap_or(HoldingType::Other);
         Ok(Holding {
-            id: row.get::<_, i64>(0).map_err(|e| e.to_string())?,
-            symbol: row.get::<_, String>(1).map_err(|e| e.to_string())?,
-            name: row.get::<_, String>(2).map_err(|e| e.to_string())?,
-            holding_type: row
-                .get::<_, String>(3)
-                .map_err(|e| e.to_string())?
-                .parse()
-                .unwrap_or(HoldingType::Other),
-            account_id: row.get::<_, i64>(4).map_err(|e| e.to_string())?,
-            shares: row.get::<_, f64>(5).map_err(|e| e.to_string())?,
-            cost_basis: row.get::<_, f64>(6).map_err(|e| e.to_string())?,
-            avg_cost: row.get::<_, f64>(7).map_err(|e| e.to_string())?,
-            current_price: row.get::<_, f64>(8).map_err(|e| e.to_string())?,
-            current_value: row.get::<_, f64>(9).map_err(|e| e.to_string())?,
-            unrealized_pnl: row.get::<_, f64>(10).map_err(|e| e.to_string())?,
-            realized_pnl: row.get::<_, f64>(11).map_err(|e| e.to_string())?,
-            currency: row.get::<_, String>(12).map_err(|e| e.to_string())?,
-            risk_level: row.get::<_, Option<String>>(13).map_err(|e| e.to_string())?,
-            purchase_date: row.get::<_, Option<String>>(14).map_err(|e| e.to_string())?,
-            last_price_update: row.get::<_, Option<String>>(15).map_err(|e| e.to_string())?,
-            is_active: row.get::<_, i32>(16).map_err(|e| e.to_string())? == 1,
-            is_archived: row.get::<_, i32>(17).map_err(|e| e.to_string())? == 1,
-            notes: row.get::<_, Option<String>>(18).map_err(|e| e.to_string())?,
-            created_at: row.get::<_, String>(19).map_err(|e| e.to_string())?,
-            updated_at: row.get::<_, String>(20).map_err(|e| e.to_string())?,
+            id: row.get(0)?,
+            symbol: row.get(1)?,
+            name: row.get(2)?,
+            holding_type,
+            account_id: row.get(4)?,
+            shares: row.get(5)?,
+            cost_basis: row.get(6)?,
+            avg_cost: row.get(7)?,
+            current_price: row.get(8)?,
+            current_value: row.get(9)?,
+            unrealized_pnl: row.get(10)?,
+            realized_pnl: row.get(11)?,
+            currency: row.get(12)?,
+            risk_level: row.get(13)?,
+            purchase_date: row.get(14)?,
+            last_price_update: row.get(15)?,
+            is_active: row.get::<_, i32>(16)? == 1,
+            is_archived: row.get::<_, i32>(17)? == 1,
+            notes: row.get(18)?,
+            created_at: row.get(19)?,
+            updated_at: row.get(20)?,
         })
     };
 
-    let rows: Vec<Holding> = if let Some(ht) = holding_type {
+    let rows: Result<Vec<Holding>, String> = if let Some(ht) = holding_type {
         stmt.query_map([ht], holding_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
+            .collect()
     } else {
         stmt.query_map([], holding_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
+            .collect()
     };
 
-    Ok(rows)
+    rows
 }
 
 #[tauri::command]
@@ -687,7 +684,7 @@ fn get_holding(state: tauri::State<AppState>, id: i64) -> Result<Holding, String
 #[tauri::command]
 fn create_holding(state: tauri::State<AppState>, holding: Holding) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "INSERT INTO holdings (symbol, name, holding_type, account_id, shares, cost_basis, avg_cost,
@@ -710,7 +707,7 @@ fn create_holding(state: tauri::State<AppState>, holding: Holding) -> Result<i64
 #[tauri::command]
 fn update_holding(state: tauri::State<AppState>, holding: Holding) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE holdings SET symbol = ?1, name = ?2, holding_type = ?3, account_id = ?4,
                              shares = ?5, cost_basis = ?6, avg_cost = ?7, current_price = ?8,
@@ -748,7 +745,7 @@ fn update_holding(state: tauri::State<AppState>, holding: Holding) -> Result<(),
 #[tauri::command]
 fn delete_holding(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE holdings SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -760,7 +757,7 @@ fn delete_holding(state: tauri::State<AppState>, id: i64) -> Result<(), String> 
 #[tauri::command]
 fn archive_holding(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE holdings SET is_archived = 1, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -775,7 +772,7 @@ fn batch_update_holding_prices(
     prices: Vec<(String, f64)>, // (symbol, price)
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     for (symbol, price) in prices {
         // Update holdings with this symbol
@@ -910,49 +907,48 @@ fn get_templates(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
-    let template_mapper = |row: &rusqlite::Row| -> Result<Template, String> {
-        let tt_str: Option<String> = row.get::<_, Option<String>>(6).map_err(|e| e.to_string())?;
-        let tt_enum =
-            tt_str.map(|s| TransactionType::from_str(&s).unwrap_or(TransactionType::Income));
+    let template_mapper = |row: &rusqlite::Row| -> rusqlite::Result<Template> {
+        let tt_str: Option<String> = row.get(6)?;
+        let tt_enum = tt_str.and_then(|s| TransactionType::from_str(&s).ok());
+        let template_type_str: String = row.get(3)?;
+        let template_type =
+            TemplateType::from_str(&template_type_str).unwrap_or(TemplateType::Transaction);
         Ok(Template {
-            id: row.get::<_, i64>(0).map_err(|e| e.to_string())?,
-            name: row.get::<_, String>(1).map_err(|e| e.to_string())?,
-            description: row.get::<_, Option<String>>(2).map_err(|e| e.to_string())?,
-            template_type: TemplateType::from_str(&row.get::<_, String>(3).map_err(|e| e.to_string())?)
-                .unwrap_or(TemplateType::Transaction),
-            category_id: row.get::<_, Option<i64>>(4).map_err(|e| e.to_string())?,
-            account_type: row.get::<_, Option<String>>(5).map_err(|e| e.to_string())?,
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            template_type,
+            category_id: row.get(4)?,
+            account_type: row.get(5)?,
             transaction_type: tt_enum,
-            amount: row.get::<_, f64>(7).map_err(|e| e.to_string())?,
-            counterparty_id: row.get::<_, Option<i64>>(8).map_err(|e| e.to_string())?,
-            notes: row.get::<_, Option<String>>(9).map_err(|e| e.to_string())?,
-            is_active: row.get::<_, i32>(10).map_err(|e| e.to_string())? == 1,
-            use_count: row.get::<_, i32>(11).map_err(|e| e.to_string())?,
-            last_used_at: row.get::<_, Option<String>>(12).map_err(|e| e.to_string())?,
-            created_at: row.get::<_, String>(13).map_err(|e| e.to_string())?,
-            updated_at: row.get::<_, String>(14).map_err(|e| e.to_string())?,
+            amount: row.get(7)?,
+            counterparty_id: row.get(8)?,
+            notes: row.get(9)?,
+            is_active: row.get::<_, i32>(10)? == 1,
+            use_count: row.get(11)?,
+            last_used_at: row.get(12)?,
+            created_at: row.get(13)?,
+            updated_at: row.get(14)?,
         })
     };
 
-    let rows: Vec<Template> = if let Some(tt) = template_type {
+    let rows: Result<Vec<Template>, String> = if let Some(tt) = template_type {
         stmt.query_map([tt], template_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
+            .collect()
     } else {
         stmt.query_map([], template_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
+            .collect()
     };
 
-    Ok(rows)
+    rows
 }
 
 #[tauri::command]
 fn create_template(state: tauri::State<AppState>, template: Template) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "INSERT INTO templates (name, description, template_type, category_id, account_type,
                                  transaction_type, amount, counterparty_id, notes, is_active,
@@ -978,7 +974,7 @@ fn create_template(state: tauri::State<AppState>, template: Template) -> Result<
 #[tauri::command]
 fn update_template(state: tauri::State<AppState>, template: Template) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE templates SET name = ?1, description = ?2, template_type = ?3, category_id = ?4,
                                account_type = ?5, transaction_type = ?6, amount = ?7,
@@ -1006,7 +1002,7 @@ fn update_template(state: tauri::State<AppState>, template: Template) -> Result<
 #[tauri::command]
 fn delete_template(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE templates SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -1018,7 +1014,7 @@ fn delete_template(state: tauri::State<AppState>, id: i64) -> Result<(), String>
 #[tauri::command]
 fn increment_template_use_count(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE templates SET use_count = use_count + 1, last_used_at = ?1, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -1034,7 +1030,7 @@ fn increment_template_use_count(state: tauri::State<AppState>, id: i64) -> Resul
 fn get_snapshots(
     state: tauri::State<AppState>,
     snapshot_type: Option<String>,
-    limit: Option<i64>,
+    _limit: Option<i64>,
 ) -> Result<Vec<Snapshot>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
 
@@ -1050,36 +1046,34 @@ fn get_snapshots(
 
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
-    let snapshot_mapper = |row: &rusqlite::Row| -> Result<Snapshot, String> {
+    let snapshot_mapper = |row: &rusqlite::Row| -> rusqlite::Result<Snapshot> {
         Ok(Snapshot {
-            id: row.get::<_, i64>(0).map_err(|e| e.to_string())?,
-            snapshot_date: row.get::<_, String>(1).map_err(|e| e.to_string())?,
-            snapshot_type: row.get::<_, String>(2).map_err(|e| e.to_string())?,
-            total_assets: row.get::<_, f64>(3).map_err(|e| e.to_string())?,
-            total_liabilities: row.get::<_, f64>(4).map_err(|e| e.to_string())?,
-            net_assets: row.get::<_, f64>(5).map_err(|e| e.to_string())?,
-            asset_breakdown: row.get::<_, Option<String>>(6).map_err(|e| e.to_string())?,
-            liability_breakdown: row.get::<_, Option<String>>(7).map_err(|e| e.to_string())?,
-            holdings_value: row.get::<_, f64>(8).map_err(|e| e.to_string())?,
-            cash_flow: row.get::<_, f64>(9).map_err(|e| e.to_string())?,
-            notes: row.get::<_, Option<String>>(10).map_err(|e| e.to_string())?,
-            created_at: row.get::<_, String>(11).map_err(|e| e.to_string())?,
+            id: row.get(0)?,
+            snapshot_date: row.get(1)?,
+            snapshot_type: row.get(2)?,
+            total_assets: row.get(3)?,
+            total_liabilities: row.get(4)?,
+            net_assets: row.get(5)?,
+            asset_breakdown: row.get(6)?,
+            liability_breakdown: row.get(7)?,
+            holdings_value: row.get(8)?,
+            cash_flow: row.get(9)?,
+            notes: row.get(10)?,
+            created_at: row.get(11)?,
         })
     };
 
-    let rows: Vec<Snapshot> = if let Some(st) = snapshot_type {
+    let rows: Result<Vec<Snapshot>, String> = if let Some(st) = snapshot_type {
         stmt.query_map([st], snapshot_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
+            .collect()
     } else {
         stmt.query_map([], snapshot_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
+            .collect()
     };
 
-    Ok(rows)
+    rows
 }
 
 #[tauri::command]
@@ -1148,7 +1142,7 @@ fn delete_snapshot(state: tauri::State<AppState>, id: i64) -> Result<(), String>
 #[tauri::command]
 fn create_auto_snapshot(state: tauri::State<AppState>) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let now = Utc::now().format("%Y-%m-%d").to_string();
 
     // Calculate totals
     let total_assets: f64 = conn
@@ -1194,7 +1188,10 @@ fn create_auto_snapshot(state: tauri::State<AppState>) -> Result<i64, String> {
 // INSURANCES
 // =============================================================================
 
-fn check_and_create_renewal_reminder(conn: &Connection, insurance: &Insurance) -> Result<(), String> {
+fn check_and_create_renewal_reminder(
+    conn: &Connection,
+    insurance: &Insurance,
+) -> Result<(), String> {
     if !insurance.is_renewal_reminder || insurance.renewal_date.is_none() {
         return Ok(());
     }
@@ -1202,9 +1199,9 @@ fn check_and_create_renewal_reminder(conn: &Connection, insurance: &Insurance) -
     let renewal = insurance.renewal_date.as_ref().unwrap();
     let reminder_date = format!(
         "{}",
-        chrono::NaiveDate::parse_from_str(renewal, "%Y-%m-%d")
+        NaiveDate::parse_from_str(renewal, "%Y-%m-%d")
             .map_err(|e| e.to_string())?
-            .pred_opt()
+            .pred()
             .ok_or("Cannot calculate reminder date")?
     );
 
@@ -1219,13 +1216,15 @@ fn check_and_create_renewal_reminder(conn: &Connection, insurance: &Insurance) -
     }
 
     conn.execute(
-        "INSERT INTO reminders (title, reminder_type, description, target_date, related_id, is_active, created_at, updated_at)
-         VALUES (?1, 'insurance_renewal', ?2, ?3, ?4, 1, datetime('now'), datetime('now'))",
+        "INSERT INTO reminders (title, reminder_type, account_id, holding_id, related_id,
+                                target_date, advance_days, is_repeating, repeat_interval,
+                                repeat_unit, is_active, is_completed, notes, created_at, updated_at)
+         VALUES (?1, 'insurance_renewal', NULL, NULL, ?2, ?3, 3, 0, NULL, NULL, 1, 0, ?4, datetime('now'), datetime('now'))",
         rusqlite::params![
             format!("保险续保提醒: {}", insurance.name),
-            format!("{} 保险将于 {} 到期，请及时续保", insurance.name, renewal),
+            insurance.id,
             reminder_date,
-            insurance.id
+            format!("{} 保险将于 {} 到期，请及时续保", insurance.name, renewal),
         ],
     ).map_err(|e| e.to_string())?;
 
@@ -1244,7 +1243,8 @@ fn get_insurances(
                    insured_name, beneficiary, premium, premium_frequency, coverage_amount,
                    coverage_type, coverage_detail, start_date, renewal_date, end_date,
                    status, notes, doc_path, is_renewal_reminder, is_active, created_at, updated_at
-                   FROM insurances WHERE is_active = 1".to_string();
+                   FROM insurances WHERE is_active = 1"
+        .to_string();
 
     if insurance_type.is_some() {
         sql.push_str(" AND insurance_type = ?1");
@@ -1260,36 +1260,43 @@ fn get_insurances(
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-    let rows = if let (Some(t), Some(s)) = (insurance_type.clone(), status) {
-        stmt.query_map([t, s], |row| Insurance::from_row(row))
-    } else if let Some(t) = insurance_type {
-        stmt.query_map([t], |row| Insurance::from_row(row))
-    } else if let Some(s) = status {
-        stmt.query_map([s], |row| Insurance::from_row(row))
-    } else {
-        stmt.query_map([], |row| Insurance::from_row(row))
-    }.map_err(|e| e.to_string())?;
+    let mapper = |row: &rusqlite::Row| Insurance::from_row(row);
+    let rows: Result<Vec<Insurance>, String> =
+        if let (Some(t), Some(s)) = (insurance_type.clone(), status) {
+            stmt.query_map([t, s], mapper)
+        } else if let Some(t) = insurance_type {
+            stmt.query_map([t], mapper)
+        } else if let Some(s) = status {
+            stmt.query_map([s], mapper)
+        } else {
+            stmt.query_map([], mapper)
+        }
+        .map_err(|e| e.to_string())?
+        .collect();
 
-    rows.collect::<Result<Vec<_}, _>>().map_err(|e| e.to_string())
+    rows.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_insurance(state: tauri::State<AppState>, id: i64) -> Result<Insurance, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare(
-        "SELECT id, name, insurance_type, provider, policy_no, holder_name,
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, insurance_type, provider, policy_no, holder_name,
                 insured_name, beneficiary, premium, premium_frequency, coverage_amount,
                 coverage_type, coverage_detail, start_date, renewal_date, end_date,
                 status, notes, doc_path, is_renewal_reminder, is_active, created_at, updated_at
-         FROM insurances WHERE id = ?1"
-    ).map_err(|e| e.to_string())?;
-    stmt.query_row([id], Insurance::from_row).map_err(|e| e.to_string())
+         FROM insurances WHERE id = ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    stmt.query_row([id], Insurance::from_row)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn create_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "INSERT INTO insurances (name, insurance_type, provider, policy_no, holder_name,
@@ -1333,7 +1340,7 @@ fn create_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Resu
 #[tauri::command]
 fn update_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "UPDATE insurances SET name = ?1, insurance_type = ?2, provider = ?3, policy_no = ?4,
@@ -1375,12 +1382,13 @@ fn update_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Resu
 #[tauri::command]
 fn delete_insurance(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     conn.execute(
         "UPDATE insurances SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -1398,11 +1406,12 @@ fn get_reminders(
 ) -> Result<Vec<Reminder>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
 
-    let mut sql = "SELECT id, title, reminder_type, account_id, holding_id, target_date,
+    let mut sql =
+        "SELECT id, title, reminder_type, account_id, holding_id, related_id, target_date,
                    advance_days, is_repeating, repeat_interval, repeat_unit, is_active,
                    is_completed, completed_at, notes, created_at, updated_at
                    FROM reminders WHERE 1=1"
-        .to_string();
+            .to_string();
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
     if let Some(rt) = reminder_type {
@@ -1430,17 +1439,18 @@ fn get_reminders(
                     .unwrap_or(ReminderType::Custom),
                 account_id: row.get(3)?,
                 holding_id: row.get(4)?,
-                target_date: row.get(5)?,
-                advance_days: row.get(6)?,
-                is_repeating: row.get::<_, i32>(7)? == 1,
-                repeat_interval: row.get(8)?,
-                repeat_unit: row.get(9)?,
-                is_active: row.get::<_, i32>(10)? == 1,
-                is_completed: row.get::<_, i32>(11)? == 1,
-                completed_at: row.get(12)?,
-                notes: row.get(13)?,
-                created_at: row.get(14)?,
-                updated_at: row.get(15)?,
+                related_id: row.get(5)?,
+                target_date: row.get(6)?,
+                advance_days: row.get(7)?,
+                is_repeating: row.get::<_, i32>(8)? == 1,
+                repeat_interval: row.get(9)?,
+                repeat_unit: row.get(10)?,
+                is_active: row.get::<_, i32>(11)? == 1,
+                is_completed: row.get::<_, i32>(12)? == 1,
+                completed_at: row.get(13)?,
+                notes: row.get(14)?,
+                created_at: row.get(15)?,
+                updated_at: row.get(16)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -1452,16 +1462,16 @@ fn get_reminders(
 #[tauri::command]
 fn get_pending_reminders(state: tauri::State<AppState>) -> Result<Vec<Reminder>, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let future = chrono::Utc::now()
-        .checked_add_signed(chrono::Duration::days(30))
+    let now = Utc::now().format("%Y-%m-%d").to_string();
+    let future = Utc::now()
+        .checked_add_signed(Duration::days(30))
         .unwrap()
         .format("%Y-%m-%d")
         .to_string();
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, reminder_type, account_id, holding_id, target_date,
+            "SELECT id, title, reminder_type, account_id, holding_id, related_id, target_date,
                 advance_days, is_repeating, repeat_interval, repeat_unit, is_active,
                 is_completed, completed_at, notes, created_at, updated_at
          FROM reminders
@@ -1481,17 +1491,18 @@ fn get_pending_reminders(state: tauri::State<AppState>) -> Result<Vec<Reminder>,
                     .unwrap_or(ReminderType::Custom),
                 account_id: row.get(3)?,
                 holding_id: row.get(4)?,
-                target_date: row.get(5)?,
-                advance_days: row.get(6)?,
-                is_repeating: row.get::<_, i32>(7)? == 1,
-                repeat_interval: row.get(8)?,
-                repeat_unit: row.get(9)?,
-                is_active: row.get::<_, i32>(10)? == 1,
-                is_completed: row.get::<_, i32>(11)? == 1,
-                completed_at: row.get(12)?,
-                notes: row.get(13)?,
-                created_at: row.get(14)?,
-                updated_at: row.get(15)?,
+                related_id: row.get(5)?,
+                target_date: row.get(6)?,
+                advance_days: row.get(7)?,
+                is_repeating: row.get::<_, i32>(8)? == 1,
+                repeat_interval: row.get(9)?,
+                repeat_unit: row.get(10)?,
+                is_active: row.get::<_, i32>(11)? == 1,
+                is_completed: row.get::<_, i32>(12)? == 1,
+                completed_at: row.get(13)?,
+                notes: row.get(14)?,
+                created_at: row.get(15)?,
+                updated_at: row.get(16)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -1503,17 +1514,18 @@ fn get_pending_reminders(state: tauri::State<AppState>) -> Result<Vec<Reminder>,
 #[tauri::command]
 fn create_reminder(state: tauri::State<AppState>, reminder: Reminder) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
-        "INSERT INTO reminders (title, reminder_type, account_id, holding_id, target_date,
+        "INSERT INTO reminders (title, reminder_type, account_id, holding_id, related_id, target_date,
                                 advance_days, is_repeating, repeat_interval, repeat_unit,
                                 is_active, is_completed, notes, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, 0, ?10, ?11, ?11)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 1, 0, ?11, ?12, ?12)",
         rusqlite::params![
             reminder.title,
             reminder.reminder_type.to_string(),
             reminder.account_id,
             reminder.holding_id,
+            reminder.related_id,
             reminder.target_date,
             reminder.advance_days,
             reminder.is_repeating as i32,
@@ -1530,17 +1542,18 @@ fn create_reminder(state: tauri::State<AppState>, reminder: Reminder) -> Result<
 #[tauri::command]
 fn update_reminder(state: tauri::State<AppState>, reminder: Reminder) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE reminders SET title = ?1, reminder_type = ?2, account_id = ?3, holding_id = ?4,
-                               target_date = ?5, advance_days = ?6, is_repeating = ?7,
-                               repeat_interval = ?8, repeat_unit = ?9, is_active = ?10,
-                               notes = ?11, updated_at = ?12 WHERE id = ?13",
+                               related_id = ?5, target_date = ?6, advance_days = ?7,
+                               is_repeating = ?8, repeat_interval = ?9, repeat_unit = ?10,
+                               is_active = ?11, notes = ?12, updated_at = ?13 WHERE id = ?14",
         rusqlite::params![
             reminder.title,
             reminder.reminder_type.to_string(),
             reminder.account_id,
             reminder.holding_id,
+            reminder.related_id,
             reminder.target_date,
             reminder.advance_days,
             reminder.is_repeating as i32,
@@ -1559,7 +1572,7 @@ fn update_reminder(state: tauri::State<AppState>, reminder: Reminder) -> Result<
 #[tauri::command]
 fn delete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "UPDATE reminders SET is_active = 0, updated_at = ?1 WHERE id = ?2",
         rusqlite::params![now, id],
@@ -1571,7 +1584,7 @@ fn delete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), String>
 #[tauri::command]
 fn complete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Check if it's repeating, if so schedule next occurrence
     let is_repeating: bool = conn
@@ -1601,14 +1614,10 @@ fn complete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), Strin
             .unwrap_or_else(|| "day".to_string());
 
         let next_date = match repeat_unit.as_str() {
-            "day" => chrono::Utc::now()
-                .checked_add_signed(chrono::Duration::days(repeat_interval as i64)),
-            "week" => chrono::Utc::now()
-                .checked_add_signed(chrono::Duration::weeks(repeat_interval as i64)),
-            "month" => chrono::Utc::now()
-                .checked_add_signed(chrono::Duration::days((repeat_interval as i64) * 30)),
-            "year" => chrono::Utc::now()
-                .checked_add_signed(chrono::Duration::days((repeat_interval as i64) * 365)),
+            "day" => Utc::now().checked_add_signed(Duration::days(repeat_interval as i64)),
+            "week" => Utc::now().checked_add_signed(Duration::weeks(repeat_interval as i64)),
+            "month" => Utc::now().checked_add_signed(Duration::days((repeat_interval as i64) * 30)),
+            "year" => Utc::now().checked_add_signed(Duration::days((repeat_interval as i64) * 365)),
             _ => None,
         };
 
@@ -1686,7 +1695,7 @@ fn set_setting(
     description: Option<String>,
 ) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value, value_type, description, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -1751,7 +1760,7 @@ fn set_password(state: tauri::State<AppState>, password: String) -> Result<(), S
     }
     let hash = hash_password(&password)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value, value_type, description, updated_at)
          VALUES ('app_password', ?1, 'string', '应用程序密码', ?2)",
@@ -1804,14 +1813,14 @@ fn get_db_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 fn create_backup(app: tauri::AppHandle) -> Result<BackupInfo, String> {
     let backup_dir = get_backup_dir(&app)?;
     let db_path = get_db_path(&app)?;
-    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
+    let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
     let backup_filename = format!("lcgl_backup_{}.db", timestamp);
     let backup_path = backup_dir.join(&backup_filename);
 
     std::fs::copy(&db_path, &backup_path).map_err(|e| format!("备份创建失败: {}", e))?;
     let metadata = std::fs::metadata(&backup_path).map_err(|e| e.to_string())?;
     let size_bytes = metadata.len();
-    let created_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let created_at = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Cleanup old backups if max_count is set
     if let Ok(max_count) = get_auto_backup_max_count_internal(&app) {
@@ -1826,7 +1835,7 @@ fn create_backup(app: tauri::AppHandle) -> Result<BackupInfo, String> {
     })
 }
 
-fn get_auto_backup_max_count_internal(app: &tauri::AppHandle) -> Result<i32, String> {
+fn get_auto_backup_max_count_internal(_app: &tauri::AppHandle) -> Result<i32, String> {
     // This is a simplified internal function - actual impl would query settings
     Ok(10)
 }
@@ -1861,7 +1870,7 @@ fn list_backups(app: tauri::AppHandle) -> Result<Vec<BackupInfo>, String> {
                 .created()
                 .ok()
                 .and_then(|t| {
-                    let datetime: chrono::DateTime<chrono::Utc> = t.into();
+                    let datetime: DateTime<Utc> = t.into();
                     Some(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
                 })
                 .unwrap_or_else(|| "Unknown".to_string());

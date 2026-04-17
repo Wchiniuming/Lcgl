@@ -208,12 +208,13 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_type ON snapshots(snapshot_type);
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,                          -- Reminder title
-    reminder_type TEXT NOT NULL CHECK(reminder_type IN ('account_update', 'payment_due', 'loan_due', 'investment_due', 'custom')),
+    reminder_type TEXT NOT NULL CHECK(reminder_type IN ('account_update', 'payment_due', 'loan_due', 'investment_due', 'insurance_renewal', 'custom')),
     account_id INTEGER,                           -- FK to accounts (optional)
     holding_id INTEGER,                           -- FK to holdings (optional)
+    related_id INTEGER,
     target_date TEXT NOT NULL,                     -- Target date
     advance_days INTEGER DEFAULT 3,               -- Days to advance reminder
-    is_repeating INTEGER DEFAULT 0,               -- Is repeating reminder
+    is_repeating INTEGER DEFAULT 0,                -- Is repeating reminder
     repeat_interval INTEGER,                      -- Repeat interval in days
     repeat_unit TEXT CHECK(repeat_unit IN ('day', 'week', 'month', 'year')),
     is_active INTEGER DEFAULT 1,                   -- Soft delete / dismiss
