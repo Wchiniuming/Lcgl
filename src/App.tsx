@@ -8,6 +8,7 @@ import InvestmentDashboard from './pages/InvestmentDashboard';
 import ProfitAnalysis from './pages/ProfitAnalysis';
 import Planning from './pages/Planning';
 import CustomDashboard from './pages/CustomDashboard';
+import Insurance from './pages/Insurance';
 import './App.css';
 
 const navGroups = [
@@ -38,6 +39,13 @@ const navGroups = [
         label: '投资组合',
         icon: '📈',
         description: '追踪持仓与盈亏',
+        badge: null,
+      },
+      {
+        path: '/insurance',
+        label: '保险管理',
+        icon: '🛡️',
+        description: '管理保险保单',
         badge: null,
       },
     ],
@@ -259,6 +267,7 @@ function App() {
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/investment-dashboard" element={<InvestmentDashboard />} />
             <Route path="/reminders" element={<Reminders />} />
+            <Route path="/insurance" element={<Insurance />} />
             <Route path="/import-export" element={<ImportExport />} />
             <Route path="/profit-analysis" element={<ProfitAnalysis />} />
             <Route path="/custom-dashboard" element={<CustomDashboard />} />

@@ -20,6 +20,7 @@ const REMINDER_TYPE_LABELS: Record<ReminderType, string> = {
   payment_due: '还款提醒',
   loan_due: '贷款到期提醒',
   investment_due: '投资到期提醒',
+  insurance_renewal: '保险续保提醒',
   custom: '自定义提醒',
 };
 
@@ -28,6 +29,7 @@ const REMINDER_TYPE_ICONS: Record<ReminderType, string> = {
   payment_due: '💳',
   loan_due: '🏦',
   investment_due: '📈',
+  insurance_renewal: '🛡️',
   custom: '🔔',
 };
 
@@ -93,6 +95,7 @@ export default function Reminders() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCreateReminder = async () => {

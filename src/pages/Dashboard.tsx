@@ -7,10 +7,12 @@ import {
   AccountCategory,
   Snapshot,
   Transaction,
+  Insurance,
   getAllAccounts,
   getAllAccountCategories,
   getSnapshots,
   getTransactions,
+  getInsurances,
 } from '../lib/api';
 
 type TrendRange = '3M' | '6M' | '1Y' | 'custom';
@@ -514,6 +516,7 @@ export default function Dashboard() {
   const [categories, setCategories] = useState<AccountCategory[]>([]);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [insurances, setInsurances] = useState<Insurance[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [trendRange, setTrendRange] = useState<TrendRange>('6M');
@@ -525,16 +528,18 @@ export default function Dashboard() {
     async function load() {
       setLoading(true);
       try {
-        const [accts, cats, snps, txs] = await Promise.all([
+        const [accts, cats, snps, txs, ins] = await Promise.all([
           getAllAccounts(),
           getAllAccountCategories(),
           getSnapshots({ limit: 30 }),
           getTransactions({ limit: 500 }),
+          getInsurances(),
         ]);
         setAccounts(accts);
         setCategories(cats);
         setSnapshots(snps);
         setTransactions(txs);
+        setInsurances(ins);
       } catch (e) {
         console.error('Dashboard load error', e);
       } finally {
@@ -561,6 +566,21 @@ export default function Dashboard() {
     .filter((tx) => tx.transaction_type === 'expense')
     .reduce((s, tx) => s + tx.amount, 0);
   const monthlyCashFlow = monthlyIncome - monthlyExpense;
+
+  const totalPremium = insurances
+    .filter((i) => i.is_active)
+    .reduce((s, i) => s + (i.premium || 0), 0);
+  const totalCoverage = insurances
+    .filter((i) => i.is_active)
+    .reduce((s, i) => s + (i.coverage_amount || 0), 0);
+  const activeInsuranceCount = insurances.filter((i) => i.is_active && i.status === 'active').length;
+  const renewalSoon = insurances.filter((i) => {
+    if (!i.renewal_date || !i.is_active) return false;
+    const today = new Date();
+    const renewal = new Date(i.renewal_date);
+    const daysUntil = Math.ceil((renewal.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntil > 0 && daysUntil <= 30;
+  }).length;
 
   const getAssetDonutOption = useCallback((): EChartsOption => {
     const assetAccounts = accounts.filter((a) => a.type === 'asset');
@@ -995,6 +1015,77 @@ export default function Dashboard() {
           subValue={`收入¥${monthlyIncome.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} / 支出¥${monthlyExpense.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`}
           subLabel="本月收支"
         />
+      </div>
+
+      {/* Insurance Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-lg">🛡️</span>
+          <h2 className="text-base font-semibold text-slate-700">保险保障</h2>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div
+            className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+              boxShadow: '0 8px 32px -8px rgba(14,165,233,0.45)',
+            }}
+          >
+            <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
+              <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
+            </div>
+            <div className="relative">
+              <p className="text-sm font-medium opacity-90 mb-1">总保费</p>
+              <p className="text-2xl font-bold tracking-tight">
+                ¥{totalPremium.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10px] mt-1 opacity-70">
+                {activeInsuranceCount} 份有效保单
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              boxShadow: '0 8px 32px -8px rgba(245,158,11,0.45)',
+            }}
+          >
+            <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
+              <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
+            </div>
+            <div className="relative">
+              <p className="text-sm font-medium opacity-90 mb-1">总保额</p>
+              <p className="text-2xl font-bold tracking-tight">
+                ¥{totalCoverage.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-[10px] mt-1 opacity-70">
+                风险保障总额
+              </p>
+            </div>
+          </div>
+          <div
+            className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+            style={{
+              background: renewalSoon > 0
+                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                : 'linear-gradient(135deg, #10b981, #059669)',
+              boxShadow: renewalSoon > 0 ? '0 8px 32px -8px rgba(239,68,68,0.45)' : '0 8px 32px -8px rgba(16,185,129,0.45)',
+            }}
+          >
+            <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
+              <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
+            </div>
+            <div className="relative">
+              <p className="text-sm font-medium opacity-90 mb-1">待续保</p>
+              <p className="text-2xl font-bold tracking-tight">{renewalSoon}</p>
+              <p className="text-[10px] mt-1 opacity-70">
+                {renewalSoon > 0 ? '30天内需要续保' : '暂无续保提醒'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {(netWorthPositive || cashFlowPositive) && (

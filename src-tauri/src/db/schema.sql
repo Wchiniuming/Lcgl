@@ -308,3 +308,37 @@ INSERT INTO settings (key, value, value_type, description) VALUES
 ('backup_interval_days', '7', 'number', 'Backup interval in days'),
 ('session_timeout_minutes', '30', 'number', 'Session timeout in minutes'),
 ('asset_update_reminder_days', '30', 'number', 'Days between asset update reminders');
+
+-- ============================================
+-- INSURANCES (保险)
+-- ============================================
+CREATE TABLE IF NOT EXISTS insurances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,                           -- 保险名称
+    insurance_type TEXT NOT NULL DEFAULT 'other', -- 保险类型
+    provider TEXT,                               -- 保险公司
+    policy_no TEXT,                             -- 保单号
+    holder_name TEXT,                           -- 投保人
+    insured_name TEXT,                           -- 被保险人
+    beneficiary TEXT,                            -- 受益人
+    premium REAL DEFAULT 0,                     -- 保费金额
+    premium_frequency TEXT,                      -- 缴费频率
+    coverage_amount REAL DEFAULT 0,              -- 保额
+    coverage_type TEXT,                          -- 保障类型
+    coverage_detail TEXT,                        -- 保障详情
+    start_date TEXT,                            -- 生效日期
+    renewal_date TEXT,                          -- 续保日期
+    end_date TEXT,                              -- 截止日期
+    status TEXT DEFAULT 'active',               -- 状态
+    notes TEXT,                                 -- 备注
+    doc_path TEXT,                              -- PDF文件路径
+    is_renewal_reminder INTEGER DEFAULT 1,     -- 启用续保提醒
+    is_active INTEGER DEFAULT 1,                -- 软删除
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_insurances_type ON insurances(insurance_type);
+CREATE INDEX IF NOT EXISTS idx_insurances_status ON insurances(status);
+CREATE INDEX IF NOT EXISTS idx_insurances_active ON insurances(is_active);
+CREATE INDEX IF NOT EXISTS idx_insurances_renewal ON insurances(renewal_date);

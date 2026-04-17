@@ -2,8 +2,8 @@ mod db;
 
 use db::{
     get_schema_version, initialize_database, Account, AccountCategory, AccountType, Holding,
-    HoldingType, Price, Reminder, ReminderType, Setting, Snapshot, Template, TemplateType,
-    Transaction, TransactionType,
+    HoldingType, Insurance, Price, Reminder, ReminderType, Setting, Snapshot, Template,
+    TemplateType, Transaction, TransactionType,
 };
 use rusqlite::Connection;
 use std::str::FromStr;
@@ -597,30 +597,31 @@ fn get_holdings(
 
     let holding_mapper = |row: &rusqlite::Row| -> Result<Holding, String> {
         Ok(Holding {
-            id: row.get(0)?,
-            symbol: row.get(1)?,
-            name: row.get(2)?,
+            id: row.get::<_, i64>(0).map_err(|e| e.to_string())?,
+            symbol: row.get::<_, String>(1).map_err(|e| e.to_string())?,
+            name: row.get::<_, String>(2).map_err(|e| e.to_string())?,
             holding_type: row
-                .get::<_, String>(3)?
+                .get::<_, String>(3)
+                .map_err(|e| e.to_string())?
                 .parse()
                 .unwrap_or(HoldingType::Other),
-            account_id: row.get(4)?,
-            shares: row.get(5)?,
-            cost_basis: row.get(6)?,
-            avg_cost: row.get(7)?,
-            current_price: row.get(8)?,
-            current_value: row.get(9)?,
-            unrealized_pnl: row.get(10)?,
-            realized_pnl: row.get(11)?,
-            currency: row.get(12)?,
-            risk_level: row.get(13)?,
-            purchase_date: row.get(14)?,
-            last_price_update: row.get(15)?,
-            is_active: row.get::<_, i32>(16)? == 1,
-            is_archived: row.get::<_, i32>(17)? == 1,
-            notes: row.get(18)?,
-            created_at: row.get(19)?,
-            updated_at: row.get(20)?,
+            account_id: row.get::<_, i64>(4).map_err(|e| e.to_string())?,
+            shares: row.get::<_, f64>(5).map_err(|e| e.to_string())?,
+            cost_basis: row.get::<_, f64>(6).map_err(|e| e.to_string())?,
+            avg_cost: row.get::<_, f64>(7).map_err(|e| e.to_string())?,
+            current_price: row.get::<_, f64>(8).map_err(|e| e.to_string())?,
+            current_value: row.get::<_, f64>(9).map_err(|e| e.to_string())?,
+            unrealized_pnl: row.get::<_, f64>(10).map_err(|e| e.to_string())?,
+            realized_pnl: row.get::<_, f64>(11).map_err(|e| e.to_string())?,
+            currency: row.get::<_, String>(12).map_err(|e| e.to_string())?,
+            risk_level: row.get::<_, Option<String>>(13).map_err(|e| e.to_string())?,
+            purchase_date: row.get::<_, Option<String>>(14).map_err(|e| e.to_string())?,
+            last_price_update: row.get::<_, Option<String>>(15).map_err(|e| e.to_string())?,
+            is_active: row.get::<_, i32>(16).map_err(|e| e.to_string())? == 1,
+            is_archived: row.get::<_, i32>(17).map_err(|e| e.to_string())? == 1,
+            notes: row.get::<_, Option<String>>(18).map_err(|e| e.to_string())?,
+            created_at: row.get::<_, String>(19).map_err(|e| e.to_string())?,
+            updated_at: row.get::<_, String>(20).map_err(|e| e.to_string())?,
         })
     };
 
@@ -910,26 +911,26 @@ fn get_templates(
     let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
 
     let template_mapper = |row: &rusqlite::Row| -> Result<Template, String> {
-        let tt_str: Option<String> = row.get(6)?;
+        let tt_str: Option<String> = row.get::<_, Option<String>>(6).map_err(|e| e.to_string())?;
         let tt_enum =
             tt_str.map(|s| TransactionType::from_str(&s).unwrap_or(TransactionType::Income));
         Ok(Template {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            description: row.get(2)?,
-            template_type: TemplateType::from_str(&row.get::<_, String>(3)?)
+            id: row.get::<_, i64>(0).map_err(|e| e.to_string())?,
+            name: row.get::<_, String>(1).map_err(|e| e.to_string())?,
+            description: row.get::<_, Option<String>>(2).map_err(|e| e.to_string())?,
+            template_type: TemplateType::from_str(&row.get::<_, String>(3).map_err(|e| e.to_string())?)
                 .unwrap_or(TemplateType::Transaction),
-            category_id: row.get(4)?,
-            account_type: row.get(5)?,
+            category_id: row.get::<_, Option<i64>>(4).map_err(|e| e.to_string())?,
+            account_type: row.get::<_, Option<String>>(5).map_err(|e| e.to_string())?,
             transaction_type: tt_enum,
-            amount: row.get(7)?,
-            counterparty_id: row.get(8)?,
-            notes: row.get(9)?,
-            is_active: row.get::<_, i32>(10)? == 1,
-            use_count: row.get(11)?,
-            last_used_at: row.get(12)?,
-            created_at: row.get(13)?,
-            updated_at: row.get(14)?,
+            amount: row.get::<_, f64>(7).map_err(|e| e.to_string())?,
+            counterparty_id: row.get::<_, Option<i64>>(8).map_err(|e| e.to_string())?,
+            notes: row.get::<_, Option<String>>(9).map_err(|e| e.to_string())?,
+            is_active: row.get::<_, i32>(10).map_err(|e| e.to_string())? == 1,
+            use_count: row.get::<_, i32>(11).map_err(|e| e.to_string())?,
+            last_used_at: row.get::<_, Option<String>>(12).map_err(|e| e.to_string())?,
+            created_at: row.get::<_, String>(13).map_err(|e| e.to_string())?,
+            updated_at: row.get::<_, String>(14).map_err(|e| e.to_string())?,
         })
     };
 
@@ -1051,18 +1052,18 @@ fn get_snapshots(
 
     let snapshot_mapper = |row: &rusqlite::Row| -> Result<Snapshot, String> {
         Ok(Snapshot {
-            id: row.get(0)?,
-            snapshot_date: row.get(1)?,
-            snapshot_type: row.get(2)?,
-            total_assets: row.get(3)?,
-            total_liabilities: row.get(4)?,
-            net_assets: row.get(5)?,
-            asset_breakdown: row.get(6)?,
-            liability_breakdown: row.get(7)?,
-            holdings_value: row.get(8)?,
-            cash_flow: row.get(9)?,
-            notes: row.get(10)?,
-            created_at: row.get(11)?,
+            id: row.get::<_, i64>(0).map_err(|e| e.to_string())?,
+            snapshot_date: row.get::<_, String>(1).map_err(|e| e.to_string())?,
+            snapshot_type: row.get::<_, String>(2).map_err(|e| e.to_string())?,
+            total_assets: row.get::<_, f64>(3).map_err(|e| e.to_string())?,
+            total_liabilities: row.get::<_, f64>(4).map_err(|e| e.to_string())?,
+            net_assets: row.get::<_, f64>(5).map_err(|e| e.to_string())?,
+            asset_breakdown: row.get::<_, Option<String>>(6).map_err(|e| e.to_string())?,
+            liability_breakdown: row.get::<_, Option<String>>(7).map_err(|e| e.to_string())?,
+            holdings_value: row.get::<_, f64>(8).map_err(|e| e.to_string())?,
+            cash_flow: row.get::<_, f64>(9).map_err(|e| e.to_string())?,
+            notes: row.get::<_, Option<String>>(10).map_err(|e| e.to_string())?,
+            created_at: row.get::<_, String>(11).map_err(|e| e.to_string())?,
         })
     };
 
@@ -1187,6 +1188,201 @@ fn create_auto_snapshot(state: tauri::State<AppState>) -> Result<i64, String> {
     )
     .map_err(|e| e.to_string())?;
     Ok(conn.last_insert_rowid())
+}
+
+// =============================================================================
+// INSURANCES
+// =============================================================================
+
+fn check_and_create_renewal_reminder(conn: &Connection, insurance: &Insurance) -> Result<(), String> {
+    if !insurance.is_renewal_reminder || insurance.renewal_date.is_none() {
+        return Ok(());
+    }
+
+    let renewal = insurance.renewal_date.as_ref().unwrap();
+    let reminder_date = format!(
+        "{}",
+        chrono::NaiveDate::parse_from_str(renewal, "%Y-%m-%d")
+            .map_err(|e| e.to_string())?
+            .pred_opt()
+            .ok_or("Cannot calculate reminder date")?
+    );
+
+    let exists: bool = conn.query_row(
+        "SELECT COUNT(*) > 0 FROM reminders WHERE reminder_type = 'insurance_renewal' AND related_id = ?1",
+        [insurance.id],
+        |row| row.get(0)
+    ).unwrap_or(false);
+
+    if exists {
+        return Ok(());
+    }
+
+    conn.execute(
+        "INSERT INTO reminders (title, reminder_type, description, target_date, related_id, is_active, created_at, updated_at)
+         VALUES (?1, 'insurance_renewal', ?2, ?3, ?4, 1, datetime('now'), datetime('now'))",
+        rusqlite::params![
+            format!("保险续保提醒: {}", insurance.name),
+            format!("{} 保险将于 {} 到期，请及时续保", insurance.name, renewal),
+            reminder_date,
+            insurance.id
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_insurances(
+    state: tauri::State<AppState>,
+    insurance_type: Option<String>,
+    status: Option<String>,
+) -> Result<Vec<Insurance>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+
+    let mut sql = "SELECT id, name, insurance_type, provider, policy_no, holder_name,
+                   insured_name, beneficiary, premium, premium_frequency, coverage_amount,
+                   coverage_type, coverage_detail, start_date, renewal_date, end_date,
+                   status, notes, doc_path, is_renewal_reminder, is_active, created_at, updated_at
+                   FROM insurances WHERE is_active = 1".to_string();
+
+    if insurance_type.is_some() {
+        sql.push_str(" AND insurance_type = ?1");
+    }
+    if status.is_some() {
+        if insurance_type.is_some() {
+            sql.push_str(" AND status = ?2");
+        } else {
+            sql.push_str(" AND status = ?1");
+        }
+    }
+    sql.push_str(" ORDER BY name");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+
+    let rows = if let (Some(t), Some(s)) = (insurance_type.clone(), status) {
+        stmt.query_map([t, s], |row| Insurance::from_row(row))
+    } else if let Some(t) = insurance_type {
+        stmt.query_map([t], |row| Insurance::from_row(row))
+    } else if let Some(s) = status {
+        stmt.query_map([s], |row| Insurance::from_row(row))
+    } else {
+        stmt.query_map([], |row| Insurance::from_row(row))
+    }.map_err(|e| e.to_string())?;
+
+    rows.collect::<Result<Vec<_}, _>>().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_insurance(state: tauri::State<AppState>, id: i64) -> Result<Insurance, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(
+        "SELECT id, name, insurance_type, provider, policy_no, holder_name,
+                insured_name, beneficiary, premium, premium_frequency, coverage_amount,
+                coverage_type, coverage_detail, start_date, renewal_date, end_date,
+                status, notes, doc_path, is_renewal_reminder, is_active, created_at, updated_at
+         FROM insurances WHERE id = ?1"
+    ).map_err(|e| e.to_string())?;
+    stmt.query_row([id], Insurance::from_row).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Result<i64, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    conn.execute(
+        "INSERT INTO insurances (name, insurance_type, provider, policy_no, holder_name,
+                insured_name, beneficiary, premium, premium_frequency, coverage_amount,
+                coverage_type, coverage_detail, start_date, renewal_date, end_date,
+                status, notes, doc_path, is_renewal_reminder, is_active, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, 1, ?20, ?20)",
+        rusqlite::params![
+            insurance.name,
+            insurance.insurance_type,
+            insurance.provider,
+            insurance.policy_no,
+            insurance.holder_name,
+            insurance.insured_name,
+            insurance.beneficiary,
+            insurance.premium,
+            insurance.premium_frequency,
+            insurance.coverage_amount,
+            insurance.coverage_type,
+            insurance.coverage_detail,
+            insurance.start_date,
+            insurance.renewal_date,
+            insurance.end_date,
+            insurance.status,
+            insurance.notes,
+            insurance.doc_path,
+            insurance.is_renewal_reminder as i32,
+            now
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    let id = conn.last_insert_rowid();
+    let mut new_insurance = insurance;
+    new_insurance.id = id;
+
+    check_and_create_renewal_reminder(&conn, &new_insurance)?;
+
+    Ok(id)
+}
+
+#[tauri::command]
+fn update_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    conn.execute(
+        "UPDATE insurances SET name = ?1, insurance_type = ?2, provider = ?3, policy_no = ?4,
+                holder_name = ?5, insured_name = ?6, beneficiary = ?7, premium = ?8,
+                premium_frequency = ?9, coverage_amount = ?10, coverage_type = ?11,
+                coverage_detail = ?12, start_date = ?13, renewal_date = ?14, end_date = ?15,
+                status = ?16, notes = ?17, doc_path = ?18, is_renewal_reminder = ?19, updated_at = ?20
+         WHERE id = ?21",
+        rusqlite::params![
+            insurance.name,
+            insurance.insurance_type,
+            insurance.provider,
+            insurance.policy_no,
+            insurance.holder_name,
+            insurance.insured_name,
+            insurance.beneficiary,
+            insurance.premium,
+            insurance.premium_frequency,
+            insurance.coverage_amount,
+            insurance.coverage_type,
+            insurance.coverage_detail,
+            insurance.start_date,
+            insurance.renewal_date,
+            insurance.end_date,
+            insurance.status,
+            insurance.notes,
+            insurance.doc_path,
+            insurance.is_renewal_reminder as i32,
+            now,
+            insurance.id
+        ],
+    ).map_err(|e| e.to_string())?;
+
+    check_and_create_renewal_reminder(&conn, &insurance)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_insurance(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    conn.execute(
+        "UPDATE insurances SET is_active = 0, updated_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, id],
+    ).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 // =============================================================================
@@ -1844,6 +2040,12 @@ pub fn run() {
             update_reminder,
             delete_reminder,
             complete_reminder,
+            // Insurances
+            get_insurances,
+            get_insurance,
+            create_insurance,
+            update_insurance,
+            delete_insurance,
             // Settings
             get_settings,
             get_setting,

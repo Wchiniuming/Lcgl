@@ -1,4 +1,3 @@
-use chrono::{DateTime, NaiveDate, Utc};
 use rusqlite::Row;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -329,6 +328,16 @@ impl FromStr for TemplateType {
     }
 }
 
+impl ToString for TemplateType {
+    fn to_string(&self) -> String {
+        match self {
+            TemplateType::Transaction => "transaction".to_string(),
+            TemplateType::Account => "account".to_string(),
+            TemplateType::Holding => "holding".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Template {
     pub id: i64,
@@ -417,6 +426,7 @@ pub enum ReminderType {
     PaymentDue,
     LoanDue,
     InvestmentDue,
+    InsuranceRenewal,
     Custom,
 }
 
@@ -428,6 +438,7 @@ impl FromStr for ReminderType {
             "payment_due" => Ok(ReminderType::PaymentDue),
             "loan_due" => Ok(ReminderType::LoanDue),
             "investment_due" => Ok(ReminderType::InvestmentDue),
+            "insurance_renewal" => Ok(ReminderType::InsuranceRenewal),
             "custom" => Ok(ReminderType::Custom),
             _ => Err(format!("Invalid reminder type: {}", s)),
         }
@@ -441,6 +452,7 @@ impl ToString for ReminderType {
             ReminderType::PaymentDue => "payment_due".to_string(),
             ReminderType::LoanDue => "loan_due".to_string(),
             ReminderType::InvestmentDue => "investment_due".to_string(),
+            ReminderType::InsuranceRenewal => "insurance_renewal".to_string(),
             ReminderType::Custom => "custom".to_string(),
         }
     }
@@ -524,6 +536,63 @@ impl SchemaVersion {
             version: row.get(0)?,
             applied_at: row.get(1)?,
             description: row.get(2)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Insurance {
+    pub id: i64,
+    pub name: String,
+    pub insurance_type: String,
+    pub provider: Option<String>,
+    pub policy_no: Option<String>,
+    pub holder_name: Option<String>,
+    pub insured_name: Option<String>,
+    pub beneficiary: Option<String>,
+    pub premium: f64,
+    pub premium_frequency: Option<String>,
+    pub coverage_amount: f64,
+    pub coverage_type: Option<String>,
+    pub coverage_detail: Option<String>,
+    pub start_date: Option<String>,
+    pub renewal_date: Option<String>,
+    pub end_date: Option<String>,
+    pub status: String,
+    pub notes: Option<String>,
+    pub doc_path: Option<String>,
+    pub is_renewal_reminder: bool,
+    pub is_active: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl Insurance {
+    pub fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(Insurance {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            insurance_type: row.get(2)?,
+            provider: row.get(3)?,
+            policy_no: row.get(4)?,
+            holder_name: row.get(5)?,
+            insured_name: row.get(6)?,
+            beneficiary: row.get(7)?,
+            premium: row.get(8)?,
+            premium_frequency: row.get(9)?,
+            coverage_amount: row.get(10)?,
+            coverage_type: row.get(11)?,
+            coverage_detail: row.get(12)?,
+            start_date: row.get(13)?,
+            renewal_date: row.get(14)?,
+            end_date: row.get(15)?,
+            status: row.get(16)?,
+            notes: row.get(17)?,
+            doc_path: row.get(18)?,
+            is_renewal_reminder: row.get::<_, i32>(19)? == 1,
+            is_active: row.get::<_, i32>(20)? == 1,
+            created_at: row.get(21)?,
+            updated_at: row.get(22)?,
         })
     }
 }

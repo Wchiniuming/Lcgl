@@ -9,7 +9,45 @@ export type ReminderType =
   | 'payment_due'
   | 'loan_due'
   | 'investment_due'
+  | 'insurance_renewal'
   | 'custom';
+
+export type InsuranceType =
+  | 'life'
+  | 'health'
+  | 'accident'
+  | 'critical'
+  | 'car'
+  | 'annuity'
+  | 'other';
+export type InsuranceStatus = 'active' | 'expired' | 'surrendered' | 'claimed';
+export type PremiumFrequency = 'yearly' | 'monthly' | 'quarterly';
+
+export interface Insurance {
+  id: number;
+  name: string;
+  insurance_type: InsuranceType;
+  provider: string | null;
+  policy_no: string | null;
+  holder_name: string | null;
+  insured_name: string | null;
+  beneficiary: string | null;
+  premium: number;
+  premium_frequency: PremiumFrequency | null;
+  coverage_amount: number;
+  coverage_type: string | null;
+  coverage_detail: string | null;
+  start_date: string | null;
+  renewal_date: string | null;
+  end_date: string | null;
+  status: InsuranceStatus;
+  notes: string | null;
+  doc_path: string | null;
+  is_renewal_reminder: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface AccountCategory {
   id: number;
@@ -436,6 +474,31 @@ export async function getSnapshots(options: GetSnapshotsOptions = {}): Promise<S
 
 export async function getSnapshot(id: number): Promise<Snapshot> {
   return invoke<Snapshot>('get_snapshot', { id });
+}
+
+export async function getInsurances(
+  options: { insuranceType?: string; status?: string } = {}
+): Promise<Insurance[]> {
+  return invoke<Insurance[]>('get_insurances', {
+    insuranceType: options.insuranceType ?? null,
+    status: options.status ?? null,
+  });
+}
+
+export async function getInsurance(id: number): Promise<Insurance> {
+  return invoke<Insurance>('get_insurance', { id });
+}
+
+export async function createInsurance(insurance: Insurance): Promise<number> {
+  return invoke<number>('create_insurance', { insurance });
+}
+
+export async function updateInsurance(insurance: Insurance): Promise<void> {
+  return invoke<void>('update_insurance', { insurance });
+}
+
+export async function deleteInsurance(id: number): Promise<void> {
+  return invoke<void>('delete_insurance', { id });
 }
 
 export async function createSnapshot(

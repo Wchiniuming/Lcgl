@@ -67,8 +67,6 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
 pub fn initialize_database(db_path: &Path) -> Result<Connection> {
     let conn = Connection::open(db_path)?;
 
-    conn.set_db_config(rusqlite::DbConfig::SQLITE_DBCONFIG_ENABLE_FKEY, true)?;
-
     conn.execute_batch(
         "PRAGMA journal_mode = WAL;
          PRAGMA synchronous = NORMAL;
