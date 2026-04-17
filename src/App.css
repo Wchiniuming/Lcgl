@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+:root {
+  /* Font stack - Chinese-friendly */
+  --font-family:
+    'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+}
+
+/* Apply font globally */
+* {
+  font-family: var(--font-family);
+}
+
+html,
+body,
+#root {
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light theme - soft, comfortable colors for long-term viewing */
+:root {
+  --color-bg: #f8f9fc;
+  --color-sidebar-bg: #ffffff;
+  --color-sidebar-border: #e8eaf0;
+  --color-sidebar-text: #374151;
+  --color-sidebar-text-muted: #6b7280;
+  --color-sidebar-hover: #f0f4ff;
+  --color-sidebar-active: #eef2ff;
+  --color-sidebar-active-text: #4f46e5;
+  --color-border: #e5e7eb;
+  --color-card-bg: #ffffff;
+  --color-card-hover: #fafbff;
+}
+
+/* Sidebar scrollbar styling */
+nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+nav::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+nav::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
