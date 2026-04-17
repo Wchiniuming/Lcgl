@@ -1,5 +1,5 @@
 use chrono::{DateTime, NaiveDate, Utc};
-use rusqlite::{FromSql, Row, ToSql};
+use rusqlite::Row;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -18,7 +18,7 @@ pub struct AccountCategory {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AccountType {
     Asset,
@@ -114,7 +114,7 @@ impl Account {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TransactionType {
     Income,
@@ -189,7 +189,7 @@ impl Transaction {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HoldingType {
     Stock,
@@ -309,7 +309,7 @@ impl Price {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TemplateType {
     Transaction,
@@ -410,7 +410,7 @@ impl Snapshot {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, FromSql, ToSql)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReminderType {
     AccountUpdate,
