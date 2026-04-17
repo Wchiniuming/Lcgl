@@ -595,7 +595,7 @@ fn get_holdings(
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
-let holding_mapper = |row: &rusqlite::Row| -> Result<Holding, String> {
+    let holding_mapper = |row: &rusqlite::Row| -> Result<Holding, String> {
         Ok(Holding {
             id: row.get(0)?,
             symbol: row.get(1)?,
@@ -627,12 +627,12 @@ let holding_mapper = |row: &rusqlite::Row| -> Result<Holding, String> {
     let rows: Vec<Holding> = if let Some(ht) = holding_type {
         stmt.query_map([ht], holding_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_}, _>>()
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?
     } else {
         stmt.query_map([], holding_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_}, _>>()
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?
     };
 
@@ -936,12 +936,12 @@ fn get_templates(
     let rows: Vec<Template> = if let Some(tt) = template_type {
         stmt.query_map([tt], template_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_}, _>>()
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?
     } else {
         stmt.query_map([], template_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_}, _>>()
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?
     };
 
@@ -1069,12 +1069,12 @@ fn get_snapshots(
     let rows: Vec<Snapshot> = if let Some(st) = snapshot_type {
         stmt.query_map([st], snapshot_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_}, _>>()
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?
     } else {
         stmt.query_map([], snapshot_mapper)
             .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_}, _>>()
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?
     };
 
