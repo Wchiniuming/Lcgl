@@ -1,6 +1,6 @@
 mod db;
 
-use chrono::{Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use db::{
     get_schema_version, initialize_database, Account, AccountCategory, AccountType, Holding,
     HoldingType, Insurance, Price, Reminder, ReminderType, Setting, Snapshot, Template,
@@ -1274,7 +1274,7 @@ fn get_insurances(
         .map_err(|e| e.to_string())?
         .collect();
 
-    rows.map_err(|e| e.to_string())
+    rows
 }
 
 #[tauri::command]
@@ -1347,8 +1347,9 @@ fn update_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Resu
                 holder_name = ?5, insured_name = ?6, beneficiary = ?7, premium = ?8,
                 premium_frequency = ?9, coverage_amount = ?10, coverage_type = ?11,
                 coverage_detail = ?12, start_date = ?13, renewal_date = ?14, end_date = ?15,
-                status = ?16, notes = ?17, doc_path = ?18, is_renewal_reminder = ?19, updated_at = ?20
-         WHERE id = ?21",
+                status = ?16, notes = ?17, doc_path = ?18, is_renewal_reminder = ?19,
+                is_active = ?20, updated_at = ?21
+         WHERE id = ?22",
         rusqlite::params![
             insurance.name,
             insurance.insurance_type,
@@ -1369,10 +1370,12 @@ fn update_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Resu
             insurance.notes,
             insurance.doc_path,
             insurance.is_renewal_reminder as i32,
+            insurance.is_active as i32,
             now,
             insurance.id
         ],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     check_and_create_renewal_reminder(&conn, &insurance)?;
 
@@ -1870,9 +1873,10 @@ fn list_backups(app: tauri::AppHandle) -> Result<Vec<BackupInfo>, String> {
                 .created()
                 .ok()
                 .and_then(|t| {
-                    let datetime: DateTime<Utc> = t.into();
-                    Some(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
+                    let duration = t.duration_since(std::time::UNIX_EPOCH).ok()?;
+                    DateTime::from_timestamp(duration.as_secs() as i64, duration.subsec_nanos())
                 })
+                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
             Some(BackupInfo {
                 filename: e.file_name().to_string_lossy().to_string(),
