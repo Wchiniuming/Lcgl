@@ -41,6 +41,15 @@ pub fn apply_migration(conn: &Connection, migration: &Migration) -> Result<()> {
 }
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
+    // Create schema_version table if it doesn't exist (for fresh database)
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now')),
+            description TEXT
+        );",
+    )?;
+
     let current_version = get_schema_version(conn)?;
 
     if current_version >= CURRENT_SCHEMA_VERSION {

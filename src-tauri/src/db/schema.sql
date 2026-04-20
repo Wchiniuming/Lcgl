@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     maturity_date TEXT,                           -- Maturity date
     payment_due_day INTEGER,                      -- Monthly payment due day
     is_active INTEGER DEFAULT 1,                  -- Soft delete flag
-    isarchived INTEGER DEFAULT 0,                -- Archive flag for closed accounts
+    is_archived INTEGER DEFAULT 0,                -- Archive flag for closed accounts
     notes TEXT,                                   -- Additional notes
     extra_data TEXT,                              -- JSON for additional fields
     created_at TEXT NOT NULL DEFAULT (datetime('now')),

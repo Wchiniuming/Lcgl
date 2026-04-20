@@ -169,7 +169,7 @@ fn get_all_accounts(state: tauri::State<AppState>) -> Result<Vec<Account>, Strin
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, category_id, type, balance, currency, institution, account_no,
+            "SELECT id, name, category_id, account_type, balance, currency, institution, account_no,
                 interest_rate, term_months, start_date, maturity_date, payment_due_day,
                 is_active, is_archived, notes, extra_data, created_at, updated_at
          FROM accounts WHERE is_active = 1 ORDER BY name",
@@ -215,7 +215,7 @@ fn get_account(state: tauri::State<AppState>, id: i64) -> Result<Account, String
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, name, category_id, type, balance, currency, institution, account_no,
+            "SELECT id, name, category_id, account_type, balance, currency, institution, account_no,
                 interest_rate, term_months, start_date, maturity_date, payment_due_day,
                 is_active, is_archived, notes, extra_data, created_at, updated_at
          FROM accounts WHERE id = ?1",
@@ -255,7 +255,7 @@ fn get_account(state: tauri::State<AppState>, id: i64) -> Result<Account, String
 fn create_account(state: tauri::State<AppState>, account: Account) -> Result<i64, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO accounts (name, category_id, type, balance, currency, institution, account_no,
+        "INSERT INTO accounts (name, category_id, account_type, balance, currency, institution, account_no,
                                interest_rate, term_months, start_date, maturity_date, payment_due_day,
                                is_active, is_archived, notes, extra_data)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
@@ -274,7 +274,7 @@ fn update_account(state: tauri::State<AppState>, account: Account) -> Result<(),
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
-        "UPDATE accounts SET name = ?1, category_id = ?2, type = ?3, balance = ?4, currency = ?5,
+        "UPDATE accounts SET name = ?1, category_id = ?2, account_type = ?3, balance = ?4, currency = ?5,
                              institution = ?6, account_no = ?7, interest_rate = ?8, term_months = ?9,
                              start_date = ?10, maturity_date = ?11, payment_due_day = ?12,
                              is_active = ?13, is_archived = ?14, notes = ?15, extra_data = ?16,
@@ -624,14 +624,16 @@ fn get_holdings(
         })
     };
 
-    let rows: Result<Vec<Holding>, String> = if let Some(ht) = holding_type {
+    let rows = if let Some(ht) = holding_type {
         stmt.query_map([ht], holding_mapper)
             .map_err(|e| e.to_string())?
-            .collect()
+            .collect::<Result<Vec<Holding>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())
     } else {
         stmt.query_map([], holding_mapper)
             .map_err(|e| e.to_string())?
-            .collect()
+            .collect::<Result<Vec<Holding>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())
     };
 
     rows
@@ -932,14 +934,16 @@ fn get_templates(
         })
     };
 
-    let rows: Result<Vec<Template>, String> = if let Some(tt) = template_type {
+    let rows = if let Some(tt) = template_type {
         stmt.query_map([tt], template_mapper)
             .map_err(|e| e.to_string())?
-            .collect()
+            .collect::<Result<Vec<Template>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())
     } else {
         stmt.query_map([], template_mapper)
             .map_err(|e| e.to_string())?
-            .collect()
+            .collect::<Result<Vec<Template>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())
     };
 
     rows
@@ -1063,14 +1067,16 @@ fn get_snapshots(
         })
     };
 
-    let rows: Result<Vec<Snapshot>, String> = if let Some(st) = snapshot_type {
+    let rows = if let Some(st) = snapshot_type {
         stmt.query_map([st], snapshot_mapper)
             .map_err(|e| e.to_string())?
-            .collect()
+            .collect::<Result<Vec<Snapshot>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())
     } else {
         stmt.query_map([], snapshot_mapper)
             .map_err(|e| e.to_string())?
-            .collect()
+            .collect::<Result<Vec<Snapshot>, rusqlite::Error>>()
+            .map_err(|e| e.to_string())
     };
 
     rows
@@ -1147,14 +1153,14 @@ fn create_auto_snapshot(state: tauri::State<AppState>) -> Result<i64, String> {
     // Calculate totals
     let total_assets: f64 = conn
         .query_row(
-            "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE type = 'asset' AND is_active = 1",
+            "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE account_type = 'asset' AND is_active = 1",
             [],
             |row| row.get(0),
         )
         .unwrap_or(0.0);
 
     let total_liabilities: f64 = conn.query_row(
-        "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE type = 'liability' AND is_active = 1",
+        "SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE account_type = 'liability' AND is_active = 1",
         [], |row| row.get(0)
     ).unwrap_or(0.0);
 
@@ -1201,7 +1207,7 @@ fn check_and_create_renewal_reminder(
         "{}",
         NaiveDate::parse_from_str(renewal, "%Y-%m-%d")
             .map_err(|e| e.to_string())?
-            .pred()
+            .pred_opt()
             .ok_or("Cannot calculate reminder date")?
     );
 
@@ -1261,18 +1267,15 @@ fn get_insurances(
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
     let mapper = |row: &rusqlite::Row| Insurance::from_row(row);
-    let rows: Result<Vec<Insurance>, String> =
-        if let (Some(t), Some(s)) = (insurance_type.clone(), status) {
-            stmt.query_map([t, s], mapper)
-        } else if let Some(t) = insurance_type {
-            stmt.query_map([t], mapper)
-        } else if let Some(s) = status {
-            stmt.query_map([s], mapper)
-        } else {
-            stmt.query_map([], mapper)
-        }
-        .map_err(|e| e.to_string())?
-        .collect();
+    let rows = match (insurance_type.clone(), status.clone()) {
+        (Some(t), Some(s)) => stmt.query_map([t, s], mapper),
+        (Some(t), None) => stmt.query_map([t], mapper),
+        (None, Some(s)) => stmt.query_map([s], mapper),
+        (None, None) => stmt.query_map([], mapper),
+    }
+    .map_err(|e| e.to_string())?
+    .collect::<Result<Vec<Insurance>, rusqlite::Error>>()
+    .map_err(|e| e.to_string());
 
     rows
 }

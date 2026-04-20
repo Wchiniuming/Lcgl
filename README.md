@@ -81,6 +81,93 @@ npm run dev          # 仅 Vite 前端服务器（无 Tauri 后端）
 
 访问 http://localhost:1420 可预览界面，但功能受限。
 
+## 常见构建错误排查
+
+### 1. Rust 环境缺失
+
+**报错特征：**
+
+```
+failed to run 'cargo metadata' command to get workspace directory:
+failed to run command cargo metadata --no-deps --format-version 1:
+No such file or directory (os error 2)
+```
+
+**原因：** 系统未安装 Rust 或 Cargo 未加入 PATH
+
+**解决方案：**
+
+```bash
+# 安装 Rust（macOS/Linux）
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 安装后刷新环境变量
+source $HOME/.cargo/env
+
+# 验证安装
+cargo --version
+rustc --version
+```
+
+**Windows 用户：** 从 https://rustup.rs 下载安装。
+
 ---
 
-有问题或建议？欢迎提交 Issue。
+### 2. 缺少系统依赖（Linux）
+
+**报错特征：**
+
+```
+error: failed to run custom build command for `webkit2gtk4.1-sys`
+Could not find any of: libwebkit2gtk-4.1-dev, webkit2gtk-4.1
+```
+
+**解决方案：**
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+# Fedora
+sudo dnf install gtk3-devel webkit2gtk4.1-devel libappindicator3-devel librsvg2-devel
+```
+
+---
+
+### 3. 缺少 Xcode 命令行工具（macOS）
+
+**报错特征：**
+
+```
+error: unable to find xcrun
+```
+
+**解决方案：**
+
+```bash
+xcode-select --install
+# 或
+sudo xcode-select --install
+```
+
+---
+
+### 4. 清理缓存重新构建
+
+如果遇到奇怪的构建错误，尝试清理后重试：
+
+```bash
+# 清理 Tauri 缓存
+npm run tauri clean
+
+# 或手动删除
+rm -rf src-tauri/target
+
+# 重新构建
+npm run tauri build
+```
+
+---
+
+**有问题或建议？欢迎提交 Issue。**
