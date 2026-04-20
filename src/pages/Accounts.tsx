@@ -529,30 +529,57 @@ export default function Accounts() {
         {view === 'list' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <select
-                value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value as AccountTypeFilter);
-                  setCategoryFilter('all');
-                }}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-slate-300 focus:outline-none"
-              >
-                <option value="all">全部类型</option>
-                <option value="asset">资产</option>
-                <option value="liability">负债</option>
-              </select>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-slate-300 focus:outline-none"
-              >
-                <option value="all">全部类别</option>
-                {typeCategories.map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value as AccountTypeFilter);
+                    setCategoryFilter('all');
+                  }}
+                  className="px-3 py-2 pr-8 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-slate-300 focus:outline-none"
+                >
+                  <option value="all">全部类型</option>
+                  <option value="asset">资产</option>
+                  <option value="liability">负债</option>
+                </select>
+                {typeFilter !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTypeFilter('all');
+                      setCategoryFilter('all');
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    title="清除筛选"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-3 py-2 pr-8 rounded-lg border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-slate-300 focus:outline-none"
+                >
+                  <option value="all">全部类别</option>
+                  {typeCategories.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                {categoryFilter !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter('all')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    title="清除筛选"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
               <span className="ml-auto text-sm text-slate-500">
                 共 {filteredAccounts.length} 个账户
               </span>
@@ -672,7 +699,7 @@ export default function Accounts() {
         )}
 
         {view === 'form' && (
-          <div className="max-w-2xl">
+          <div className="w-full max-w-4xl mx-auto">
             <div className="flex items-center gap-3 mb-4">
               <button
                 type="button"
@@ -693,8 +720,8 @@ export default function Accounts() {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-center gap-4 mb-6 pb-4 border-b border-slate-100">
+              <div className="p-5">
+                <div className="flex items-center gap-4 mb-4 pb-3 border-b border-slate-100">
                   {!selectedAccount && (
                     <div className="flex gap-2">
                       {(['asset', 'liability'] as const).map((t) => (
@@ -702,7 +729,7 @@ export default function Accounts() {
                           key={t}
                           type="button"
                           onClick={() => setFormData({ ...formData, type: t, category_id: '' })}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                             formData.type === t
                               ? t === 'asset'
                                 ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
@@ -717,7 +744,7 @@ export default function Accounts() {
                   )}
                   {selectedAccount && !editMode && (
                     <div
-                      className={`inline-flex px-3 py-1 rounded-lg text-sm font-medium ${selectedAccount.type === 'asset' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
+                      className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium ${selectedAccount.type === 'asset' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}
                     >
                       {selectedAccount.type === 'asset' ? '资产账户' : '负债账户'}
                     </div>
@@ -729,7 +756,7 @@ export default function Accounts() {
                           key={t}
                           type="button"
                           onClick={() => setFormData({ ...formData, type: t, category_id: '' })}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                             formData.type === t
                               ? t === 'asset'
                                 ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
@@ -744,172 +771,166 @@ export default function Accounts() {
                   )}
                 </div>
 
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label
-                        htmlFor="acc-name"
-                        className="block text-sm font-medium text-slate-700 mb-1"
-                      >
-                        账户名称 <span className="text-red-500">*</span>
-                      </label>
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label
+                      htmlFor="acc-name"
+                      className="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      名称 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="acc-name"
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      disabled={!editMode && !!selectedAccount}
+                      placeholder="账户名称"
+                      className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400
+                        ${!editMode && !!selectedAccount ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
+                        ${formErrors.name ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                        focus:outline-none`}
+                    />
+                    {formErrors.name && (
+                      <p className="mt-0.5 text-xs text-red-500">{formErrors.name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="acc-category"
+                      className="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      类别 <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="acc-category"
+                      value={formData.category_id}
+                      onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                      disabled={!editMode && !!selectedAccount}
+                      className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all
+                        ${!editMode && !!selectedAccount ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
+                        ${formErrors.category_id ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                        focus:outline-none`}
+                    >
+                      <option value="">选择类别</option>
+                      {categories
+                        .filter((c) => c.type === formData.type)
+                        .map((c) => (
+                          <option key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </option>
+                        ))}
+                    </select>
+                    {formErrors.category_id && (
+                      <p className="mt-0.5 text-xs text-red-500">{formErrors.category_id}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="acc-balance"
+                      className="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      余额
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+                        ¥
+                      </span>
                       <input
-                        id="acc-name"
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        disabled={!editMode && !!selectedAccount}
-                        placeholder="例如：招商银行储蓄卡"
-                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
-                          ${!editMode && !!selectedAccount ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
-                          ${formErrors.name ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                        id="acc-balance"
+                        type="number"
+                        step="0.01"
+                        value={formData.balance}
+                        onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                        disabled={!editMode}
+                        placeholder="0.00"
+                        className={`w-full pl-6 pr-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400
+                          ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
+                          ${formErrors.balance ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
                           focus:outline-none`}
                       />
-                      {formErrors.name && (
-                        <p className="mt-1 text-xs text-red-500">{formErrors.name}</p>
-                      )}
                     </div>
-
-                    <div>
-                      <label
-                        htmlFor="acc-category"
-                        className="block text-sm font-medium text-slate-700 mb-1"
-                      >
-                        账户类别 <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="acc-category"
-                        value={formData.category_id}
-                        onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                        disabled={!editMode && !!selectedAccount}
-                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all
-                          ${!editMode && !!selectedAccount ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
-                          ${formErrors.category_id ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                          focus:outline-none`}
-                      >
-                        <option value="">选择类别</option>
-                        {categories
-                          .filter((c) => c.type === formData.type)
-                          .map((c) => (
-                            <option key={c.id} value={String(c.id)}>
-                              {c.name}
-                            </option>
-                          ))}
-                      </select>
-                      {formErrors.category_id && (
-                        <p className="mt-1 text-xs text-red-500">{formErrors.category_id}</p>
-                      )}
-                    </div>
+                    {formErrors.balance && (
+                      <p className="mt-0.5 text-xs text-red-500">{formErrors.balance}</p>
+                    )}
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label
+                      htmlFor="acc-currency"
+                      className="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      币种
+                    </label>
+                    <select
+                      id="acc-currency"
+                      value={formData.currency}
+                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                      disabled={!editMode}
+                      className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all
+                        ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                        focus:outline-none`}
+                    >
+                      <option value="CNY">CNY</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="HKD">HKD</option>
+                      <option value="JPY">JPY</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="acc-institution"
+                      className="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      机构
+                    </label>
+                    <input
+                      id="acc-institution"
+                      type="text"
+                      value={formData.institution}
+                      onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
+                      disabled={!editMode}
+                      placeholder="机构名称"
+                      className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400
+                        ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                        focus:outline-none`}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="acc-account-no"
+                      className="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      账号
+                    </label>
+                    <input
+                      id="acc-account-no"
+                      type="text"
+                      value={formData.account_no}
+                      onChange={(e) => setFormData({ ...formData, account_no: e.target.value })}
+                      disabled={!editMode}
+                      placeholder="尾号（选填）"
+                      className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400
+                        ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                        focus:outline-none`}
+                    />
+                  </div>
+                </div>
+
+                {formData.type === 'liability' ? (
+                  <div className="grid grid-cols-3 gap-3 mb-3">
                     <div>
                       <label
-                        htmlFor="acc-balance"
-                        className="block text-sm font-medium text-slate-700 mb-1"
+                        htmlFor="acc-rate"
+                        className="block text-xs font-medium text-slate-600 mb-1"
                       >
-                        当前余额
+                        年利率
                       </label>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
-                          ¥
-                        </span>
-                        <input
-                          id="acc-balance"
-                          type="number"
-                          step="0.01"
-                          value={formData.balance}
-                          onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
-                          disabled={!editMode}
-                          placeholder="0.00"
-                          className={`w-full pl-7 pr-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
-                            ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}
-                            ${formErrors.balance ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                            focus:outline-none`}
-                        />
-                      </div>
-                      {formErrors.balance && (
-                        <p className="mt-1 text-xs text-red-500">{formErrors.balance}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="acc-currency"
-                        className="block text-sm font-medium text-slate-700 mb-1"
-                      >
-                        币种
-                      </label>
-                      <select
-                        id="acc-currency"
-                        value={formData.currency}
-                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                        disabled={!editMode}
-                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all
-                          ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                          focus:outline-none`}
-                      >
-                        <option value="CNY">人民币 (CNY)</option>
-                        <option value="USD">美元 (USD)</option>
-                        <option value="EUR">欧元 (EUR)</option>
-                        <option value="HKD">港币 (HKD)</option>
-                        <option value="JPY">日元 (JPY)</option>
-                        <option value="GBP">英镑 (GBP)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label
-                        htmlFor="acc-institution"
-                        className="block text-sm font-medium text-slate-700 mb-1"
-                      >
-                        所属机构
-                      </label>
-                      <input
-                        id="acc-institution"
-                        type="text"
-                        value={formData.institution}
-                        onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                        disabled={!editMode}
-                        placeholder="例如：招商银行"
-                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
-                          ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                          focus:outline-none`}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="acc-account-no"
-                        className="block text-sm font-medium text-slate-700 mb-1"
-                      >
-                        账户号码
-                      </label>
-                      <input
-                        id="acc-account-no"
-                        type="text"
-                        value={formData.account_no}
-                        onChange={(e) => setFormData({ ...formData, account_no: e.target.value })}
-                        disabled={!editMode}
-                        placeholder="尾号（选填）"
-                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
-                          ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                          focus:outline-none`}
-                      />
-                    </div>
-                  </div>
-
-                  {formData.type === 'liability' && (
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label
-                          htmlFor="acc-rate"
-                          className="block text-sm font-medium text-slate-700 mb-1"
-                        >
-                          年利率 (%)
-                        </label>
                         <input
                           id="acc-rate"
                           type="number"
@@ -920,65 +941,66 @@ export default function Accounts() {
                           }
                           disabled={!editMode}
                           placeholder="4.9"
-                          className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
+                          className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400
                             ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                            focus:outline-none`}
+                            focus:outline-none pr-7`}
                         />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="acc-term"
-                          className="block text-sm font-medium text-slate-700 mb-1"
-                        >
-                          期限 (月)
-                        </label>
-                        <input
-                          id="acc-term"
-                          type="number"
-                          value={formData.term_months}
-                          onChange={(e) =>
-                            setFormData({ ...formData, term_months: e.target.value })
-                          }
-                          disabled={!editMode}
-                          placeholder="360"
-                          className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
-                            ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                            focus:outline-none`}
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="acc-due-day"
-                          className="block text-sm font-medium text-slate-700 mb-1"
-                        >
-                          还款日
-                        </label>
-                        <input
-                          id="acc-due-day"
-                          type="number"
-                          min="1"
-                          max="31"
-                          value={formData.payment_due_day}
-                          onChange={(e) =>
-                            setFormData({ ...formData, payment_due_day: e.target.value })
-                          }
-                          disabled={!editMode}
-                          placeholder="15"
-                          className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400
-                            ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                            focus:outline-none`}
-                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+                          %
+                        </span>
                       </div>
                     </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label
+                        htmlFor="acc-term"
+                        className="block text-xs font-medium text-slate-600 mb-1"
+                      >
+                        期限
+                      </label>
+                      <input
+                        id="acc-term"
+                        type="number"
+                        value={formData.term_months}
+                        onChange={(e) => setFormData({ ...formData, term_months: e.target.value })}
+                        disabled={!editMode}
+                        placeholder="月数"
+                        className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400
+                          ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                          focus:outline-none`}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="acc-due-day"
+                        className="block text-xs font-medium text-slate-600 mb-1"
+                      >
+                        还款日
+                      </label>
+                      <input
+                        id="acc-due-day"
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={formData.payment_due_day}
+                        onChange={(e) =>
+                          setFormData({ ...formData, payment_due_day: e.target.value })
+                        }
+                        disabled={!editMode}
+                        placeholder="1-31"
+                        className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400
+                          ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                          focus:outline-none`}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <label
                         htmlFor="acc-start-date"
-                        className="block text-sm font-medium text-slate-700 mb-1"
+                        className="block text-xs font-medium text-slate-600 mb-1"
                       >
-                        起始日期
+                        起始日
                       </label>
                       <input
                         id="acc-start-date"
@@ -986,7 +1008,7 @@ export default function Accounts() {
                         value={formData.start_date}
                         onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                         disabled={!editMode}
-                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all
+                        className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all
                           ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
                           focus:outline-none`}
                       />
@@ -994,9 +1016,9 @@ export default function Accounts() {
                     <div>
                       <label
                         htmlFor="acc-maturity"
-                        className="block text-sm font-medium text-slate-700 mb-1"
+                        className="block text-xs font-medium text-slate-600 mb-1"
                       >
-                        到期日期
+                        到期日
                       </label>
                       <input
                         id="acc-maturity"
@@ -1006,35 +1028,35 @@ export default function Accounts() {
                           setFormData({ ...formData, maturity_date: e.target.value })
                         }
                         disabled={!editMode}
-                        className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all
+                        className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all
                           ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
                           focus:outline-none`}
                       />
                     </div>
                   </div>
+                )}
 
-                  <div>
-                    <label
-                      htmlFor="acc-notes"
-                      className="block text-sm font-medium text-slate-700 mb-1"
-                    >
-                      备注
-                    </label>
-                    <textarea
-                      id="acc-notes"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      disabled={!editMode}
-                      rows={3}
-                      placeholder="添加备注信息..."
-                      className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all placeholder:text-slate-400 resize-none
-                        ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
-                        focus:outline-none`}
-                    />
-                  </div>
+                <div className="mb-3">
+                  <label
+                    htmlFor="acc-notes"
+                    className="block text-xs font-medium text-slate-600 mb-1"
+                  >
+                    备注
+                  </label>
+                  <textarea
+                    id="acc-notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    disabled={!editMode}
+                    rows={2}
+                    placeholder="备注信息..."
+                    className={`w-full px-2.5 py-2 rounded-lg border text-xs transition-all placeholder:text-slate-400 resize-none
+                      ${!editMode ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white focus:ring-2 focus:ring-slate-300 hover:border-slate-300'}
+                      focus:outline-none`}
+                  />
                 </div>
 
-                <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100">
+                <div className="flex gap-2">
                   {editMode || !selectedAccount ? (
                     <>
                       <button
@@ -1047,7 +1069,7 @@ export default function Accounts() {
                             setView('list');
                           }
                         }}
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                        className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
                       >
                         取消
                       </button>
@@ -1055,9 +1077,9 @@ export default function Accounts() {
                         type="button"
                         onClick={handleSaveAccount}
                         disabled={formSubmitting}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-all shadow-sm shadow-indigo-200 disabled:opacity-50"
+                        className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-500 transition-all disabled:opacity-50"
                       >
-                        {formSubmitting ? '保存中...' : '保存账户'}
+                        {formSubmitting ? '保存中...' : '保存'}
                       </button>
                     </>
                   ) : (
@@ -1065,7 +1087,7 @@ export default function Accounts() {
                       <button
                         type="button"
                         onClick={() => openEditForm(selectedAccount)}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       >
                         <IconEdit />
                         <span>编辑</span>
@@ -1073,7 +1095,7 @@ export default function Accounts() {
                       <button
                         type="button"
                         onClick={() => handleDeleteAccount(selectedAccount.id)}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
                       >
                         <IconTrash />
                         <span>删除</span>

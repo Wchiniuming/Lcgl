@@ -58,19 +58,6 @@ interface DashboardLayout {
   created_at: string;
 }
 
-interface WidgetConfig {
-  type: WidgetType;
-  id: string;
-  title: string;
-}
-
-interface DashboardLayout {
-  name: string;
-  widgets: WidgetConfig[];
-  layout: LayoutItem[];
-  created_at: string;
-}
-
 // ─── Icon helpers ─────────────────────────────────────────────────────────────
 
 function IconGrip() {
@@ -145,27 +132,6 @@ function IconSave() {
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
       <polyline points="17 21 17 13 7 13 7 21" />
       <polyline points="7 3 7 8 15 8" />
-    </svg>
-  );
-}
-
-function IconTrash() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M9 6V4h6v2" />
     </svg>
   );
 }
@@ -514,16 +480,22 @@ export default function CustomDashboard() {
 
         // Load saved layouts
         const layoutsSetting = stgs.find((s) => s.key === 'custom_dashboards');
-        if (layoutsSetting) {
-          const parsed: DashboardLayout[] = JSON.parse(layoutsSetting.value);
-          setSavedLayouts(parsed);
+        let parsedLayouts: DashboardLayout[] = [];
+        if (layoutsSetting && layoutsSetting.value) {
+          try {
+            parsedLayouts = JSON.parse(layoutsSetting.value);
+            if (!Array.isArray(parsedLayouts)) parsedLayouts = [];
+            setSavedLayouts(parsedLayouts);
+          } catch (e) {
+            console.error('[DEBUG] Failed to parse layouts:', e);
+            parsedLayouts = [];
+          }
         }
 
         // Load last active layout
         const activeLayoutKey = stgs.find((s) => s.key === 'active_dashboard_layout');
-        if (activeLayoutKey) {
-          const parsed: DashboardLayout[] = layoutsSetting ? JSON.parse(layoutsSetting.value) : [];
-          const active = parsed.find((l) => l.name === activeLayoutKey.value);
+        if (activeLayoutKey && activeLayoutKey.value) {
+          const active = parsedLayouts.find((l) => l.name === activeLayoutKey.value);
           if (active) {
             setWidgets(active.widgets);
             setLayout(active.layout);
@@ -1012,6 +984,10 @@ export default function CustomDashboard() {
   const saveLayout = useCallback(async () => {
     try {
       const name = currentLayoutName;
+      if (!name || !name.trim()) {
+        alert('请输入布局名称');
+        return;
+      }
       const newLayout: DashboardLayout = {
         name,
         widgets,
@@ -1021,45 +997,31 @@ export default function CustomDashboard() {
       const all = savedLayouts.filter((l) => l.name !== name);
       all.push(newLayout);
       const allJson = JSON.stringify(all);
-      await setSetting('custom_dashboards', allJson, 'json', '自定义仪表盘布局');
+      await setSetting('custom_dashboards', allJson, 'string', '自定义仪表盘布局');
       await setSetting('active_dashboard_layout', name, 'string', '当前活动仪表盘布局');
-      setSavedLayouts(all);
+      setCurrentLayoutName(name);
       setEditingLayoutName(false);
+
+      // Reload savedLayouts from DB to ensure consistency
+      const updatedSettings = await getSettings();
+      const updatedLayouts = updatedSettings.find(
+        (s: { key: string }) => s.key === 'custom_dashboards'
+      );
+      if (updatedLayouts && updatedLayouts.value) {
+        try {
+          const parsed = JSON.parse(updatedLayouts.value);
+          setSavedLayouts(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          setSavedLayouts(all);
+        }
+      }
+
+      alert('布局保存成功！');
     } catch (e) {
       console.error('Save error', e);
+      alert('布局保存失败：' + (e as Error).message);
     }
   }, [currentLayoutName, widgets, layout, savedLayouts]);
-
-  const loadLayout = useCallback(async (layoutToLoad: DashboardLayout) => {
-    setWidgets(layoutToLoad.widgets);
-    setLayout(layoutToLoad.layout);
-    setCurrentLayoutName(layoutToLoad.name);
-    try {
-      await setSetting(
-        'active_dashboard_layout',
-        layoutToLoad.name,
-        'string',
-        '当前活动仪表盘布局'
-      );
-    } catch (e) {
-      console.error('Set active layout error', e);
-    }
-  }, []);
-
-  const deleteLayout = useCallback(
-    async (name: string) => {
-      const filtered = savedLayouts.filter((l) => l.name !== name);
-      await setSetting('custom_dashboards', JSON.stringify(filtered), 'json', '自定义仪表盘布局');
-      setSavedLayouts(filtered);
-      if (currentLayoutName === name) {
-        const def = buildDefaultLayout();
-        setWidgets(def.widgets);
-        setLayout(def.layout);
-        setCurrentLayoutName('默认布局');
-      }
-    },
-    [savedLayouts, currentLayoutName]
-  );
 
   const resetToDefault = useCallback(() => {
     const def = buildDefaultLayout();
@@ -1301,20 +1263,32 @@ export default function CustomDashboard() {
                 {group.group}
               </p>
               <div className="space-y-1">
-                {group.widgets.map((w) => (
-                  <button
-                    key={w.type}
-                    type="button"
-                    onClick={() => addWidget(w.type, w.defaultSize)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors group"
-                  >
-                    <span className="opacity-70 group-hover:opacity-100">{w.icon}</span>
-                    <span className="flex-1 text-left text-xs">{w.label}</span>
-                    <span className="opacity-0 group-hover:opacity-100 text-slate-400">
-                      <IconPlus />
-                    </span>
-                  </button>
-                ))}
+                {group.widgets.map((w) => {
+                  const isAdded = widgets.some((widget) => widget.type === w.type);
+                  return (
+                    <button
+                      key={w.type}
+                      type="button"
+                      onClick={() => !isAdded && addWidget(w.type, w.defaultSize)}
+                      disabled={isAdded}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors group ${
+                        isAdded
+                          ? 'bg-emerald-50 text-emerald-600 cursor-default'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="opacity-70 group-hover:opacity-100">{w.icon}</span>
+                      <span className="flex-1 text-left text-xs">{w.label}</span>
+                      {isAdded ? (
+                        <span className="text-emerald-500 text-xs font-medium">✓</span>
+                      ) : (
+                        <span className="opacity-0 group-hover:opacity-100 text-slate-400">
+                          <IconPlus />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -1372,52 +1346,6 @@ export default function CustomDashboard() {
               <IconSave />
               <span>保存布局</span>
             </button>
-            {savedLayouts.length > 0 && (
-              <div className="relative group">
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
-                >
-                  加载
-                  <svg
-                    aria-hidden="true"
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 hidden group-hover:block">
-                  {savedLayouts.map((l) => (
-                    <div key={l.name} className="flex items-center group/saved">
-                      <button
-                        type="button"
-                        onClick={() => loadLayout(l)}
-                        className={`flex-1 text-left px-3 py-2 text-xs hover:bg-slate-50 ${l.name === currentLayoutName ? 'text-indigo-600 font-semibold' : 'text-slate-600'}`}
-                      >
-                        {l.name}
-                      </button>
-                      {l.name !== '默认布局' && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteLayout(l.name);
-                          }}
-                          className="px-2 py-2 text-slate-400 hover:text-red-500 opacity-0 group-hover/saved:opacity-100 transition-opacity"
-                        >
-                          <IconTrash />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 

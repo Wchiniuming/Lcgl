@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import * as echarts from 'echarts';
@@ -8,12 +9,63 @@ import {
   Snapshot,
   Transaction,
   Insurance,
+  Holding,
   getAllAccounts,
   getAllAccountCategories,
   getSnapshots,
   getTransactions,
   getInsurances,
+  getHoldings,
+  getSettings,
 } from '../lib/api';
+
+// ─── Shared layout types (mirrors CustomDashboard) ───────────────────────────────
+
+type WidgetType =
+  | 'kpi_networth'
+  | 'kpi_assets'
+  | 'kpi_liabilities'
+  | 'kpi_debt_ratio'
+  | 'kpi_cashflow'
+  | 'kpi_investment_value'
+  | 'kpi_investment_return'
+  | 'chart_asset_dist'
+  | 'chart_liability'
+  | 'chart_trend'
+  | 'chart_invest_return'
+  | 'chart_holdings_rank'
+  | 'table_transactions'
+  | 'table_reminders'
+  | 'accounts_list'
+  | 'liabilities_list'
+  | 'asset_allocation'
+  | 'liability_structure'
+  | 'cashflow_trend'
+  | 'profit_summary'
+  | 'holdings_overview'
+  | 'holdings_performance'
+  | 'insurance_summary';
+
+interface LayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface WidgetConfig {
+  type: WidgetType;
+  id: string;
+  title: string;
+}
+
+interface DashboardLayout {
+  name: string;
+  widgets: WidgetConfig[];
+  layout: LayoutItem[];
+  created_at: string;
+}
 
 type TrendRange = '3M' | '6M' | '1Y' | 'custom';
 type SubDashboardTab = 'fixed' | 'cashflow' | 'liquidity';
@@ -300,7 +352,15 @@ function SubDashboard({
             <div className="grid grid-cols-4 gap-2 px-4 py-2 bg-slate-50 rounded-xl text-xs font-semibold text-slate-500">
               <span>名称</span>
               <span className="text-right">原值</span>
-              <span className="text-right">折旧</span>
+              <span className="text-right">
+                折旧
+                <span
+                  title="折旧=原值×5%（年折旧率），反映固定资产因磨损而产生的价值减少。净值=原值-折旧。"
+                  className="ml-1 text-slate-400 cursor-help"
+                >
+                  ?
+                </span>
+              </span>
               <span className="text-right">净值</span>
             </div>
             {fixedAssets.map((fa) => (
@@ -517,7 +577,11 @@ export default function Dashboard() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [insurances, setInsurances] = useState<Insurance[]>([]);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [activeLayout, setActiveLayout] = useState<DashboardLayout | null>(null);
+  const location = useLocation();
 
   const [trendRange, setTrendRange] = useState<TrendRange>('6M');
   const [subTab, setSubTab] = useState<SubDashboardTab>('fixed');
@@ -528,18 +592,38 @@ export default function Dashboard() {
     async function load() {
       setLoading(true);
       try {
-        const [accts, cats, snps, txs, ins] = await Promise.all([
+        const [accts, cats, snps, txs, ins, hlds, stgs] = await Promise.all([
           getAllAccounts(),
           getAllAccountCategories(),
           getSnapshots({ limit: 30 }),
           getTransactions({ limit: 500 }),
           getInsurances(),
+          getHoldings({}),
+          getSettings(),
         ]);
         setAccounts(accts);
         setCategories(cats);
         setSnapshots(snps);
         setTransactions(txs);
         setInsurances(ins);
+        setHoldings(hlds);
+
+        const activeLayoutKey = stgs.find((s) => s.key === 'active_dashboard_layout');
+        const layoutsSetting = stgs.find((s) => s.key === 'custom_dashboards');
+        let parsedLayouts: DashboardLayout[] = [];
+        if (layoutsSetting && layoutsSetting.value) {
+          try {
+            parsedLayouts = JSON.parse(layoutsSetting.value);
+            if (!Array.isArray(parsedLayouts)) parsedLayouts = [];
+          } catch (e) {
+            console.error('Failed to parse custom_dashboards:', e);
+            parsedLayouts = [];
+          }
+        }
+        if (activeLayoutKey && activeLayoutKey.value) {
+          const found = parsedLayouts.find((l) => l.name === activeLayoutKey.value);
+          if (found) setActiveLayout(found);
+        }
       } catch (e) {
         console.error('Dashboard load error', e);
       } finally {
@@ -547,7 +631,7 @@ export default function Dashboard() {
       }
     }
     load();
-  }, []);
+  }, [location.key]);
 
   const totalAssets = accounts.filter((a) => a.type === 'asset').reduce((s, a) => s + a.balance, 0);
   const totalLiabilities = accounts
@@ -573,7 +657,9 @@ export default function Dashboard() {
   const totalCoverage = insurances
     .filter((i) => i.is_active)
     .reduce((s, i) => s + (i.coverage_amount || 0), 0);
-  const activeInsuranceCount = insurances.filter((i) => i.is_active && i.status === 'active').length;
+  const activeInsuranceCount = insurances.filter(
+    (i) => i.is_active && i.status === 'active'
+  ).length;
   const renewalSoon = insurances.filter((i) => {
     if (!i.renewal_date || !i.is_active) return false;
     const today = new Date();
@@ -581,6 +667,10 @@ export default function Dashboard() {
     const daysUntil = Math.ceil((renewal.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntil > 0 && daysUntil <= 30;
   }).length;
+
+  const totalMarketValue = holdings.reduce((s, h) => s + h.current_value, 0);
+  const totalUnrealizedPnl = holdings.reduce((s, h) => s + h.unrealized_pnl, 0);
+  const totalInvested = holdings.reduce((s, h) => s + h.cost_basis, 0);
 
   const getAssetDonutOption = useCallback((): EChartsOption => {
     const assetAccounts = accounts.filter((a) => a.type === 'asset');
@@ -895,6 +985,522 @@ export default function Dashboard() {
     };
   }, [trendRange, snapshots, totalAssets, totalLiabilities, netWorth]);
 
+  const netWorthPositive = netWorth >= 0;
+  const cashFlowPositive = monthlyCashFlow >= 0;
+
+  const renderWidget = useCallback(
+    (widget: WidgetConfig): React.ReactNode => {
+      const { type } = widget;
+
+      if (type === 'kpi_networth') {
+        return (
+          <KpiCard
+            label="净资产"
+            value={`¥${netWorth.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+            icon={<IconPiggy />}
+            gradientFrom="#4f46e5"
+            gradientTo="#6366f1"
+            shadowColor="rgba(99,102,241,0.45)"
+            trend={2.3}
+            subValue={`¥${totalAssets.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} - ¥${totalLiabilities.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`}
+            subLabel="资产 - 负债"
+          />
+        );
+      }
+      if (type === 'kpi_assets') {
+        return (
+          <KpiCard
+            label="总资产"
+            value={`¥${totalAssets.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+            icon={<IconBuilding />}
+            gradientFrom="#10b981"
+            gradientTo="#059669"
+            shadowColor="rgba(16,185,129,0.35)"
+            trend={3.1}
+          />
+        );
+      }
+      if (type === 'kpi_liabilities') {
+        return (
+          <KpiCard
+            label="总负债"
+            value={`¥${totalLiabilities.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+            icon={<IconCard />}
+            gradientFrom="#f43f5e"
+            gradientTo="#e11d48"
+            shadowColor="rgba(244,63,94,0.35)"
+            trend={-1.2}
+          />
+        );
+      }
+      if (type === 'kpi_debt_ratio') {
+        return (
+          <KpiCard
+            label="负债资产比"
+            value={`${debtToAsset.toFixed(1)}%`}
+            icon={<IconChart />}
+            gradientFrom="#8b5cf6"
+            gradientTo="#7c3aed"
+            shadowColor="rgba(139,92,246,0.35)"
+            subValue={debtToAsset < 50 ? '健康' : debtToAsset < 80 ? '警戒' : '危险'}
+            subLabel="财务状况"
+          />
+        );
+      }
+      if (type === 'kpi_cashflow') {
+        return (
+          <KpiCard
+            label="月现金流"
+            value={`¥${monthlyCashFlow.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+            icon={<IconTrendUp />}
+            gradientFrom={cashFlowPositive ? '#0ea5e9' : '#f97316'}
+            gradientTo={cashFlowPositive ? '#0284c7' : '#ea580c'}
+            shadowColor={cashFlowPositive ? 'rgba(14,165,233,0.35)' : 'rgba(249,115,22,0.35)'}
+            subValue={`收入¥${monthlyIncome.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} / 支出¥${monthlyExpense.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`}
+            subLabel="本月收支"
+          />
+        );
+      }
+      if (type === 'kpi_investment_value') {
+        return (
+          <KpiCard
+            label="投资总额"
+            value={`¥${totalMarketValue.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+            icon={<IconChart />}
+            gradientFrom="#6366f1"
+            gradientTo="#4f46e5"
+            shadowColor="rgba(99,102,241,0.35)"
+            subValue={`¥${totalUnrealizedPnl >= 0 ? '+' : ''}${totalUnrealizedPnl.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`}
+            subLabel="未实现收益"
+          />
+        );
+      }
+      if (type === 'kpi_investment_return') {
+        return (
+          <KpiCard
+            label="投资收益"
+            value={`¥${totalUnrealizedPnl.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+            icon={<IconChart />}
+            gradientFrom={totalUnrealizedPnl >= 0 ? '#10b981' : '#f43f5e'}
+            gradientTo={totalUnrealizedPnl >= 0 ? '#059669' : '#e11d48'}
+            shadowColor={totalUnrealizedPnl >= 0 ? 'rgba(16,185,129,0.35)' : 'rgba(244,63,94,0.35)'}
+            subValue={`成本 ¥${totalInvested.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`}
+            subLabel="投资成本"
+          />
+        );
+      }
+      if (type === 'chart_asset_dist' || type === 'asset_allocation') {
+        return (
+          <ChartCard
+            title={widget.title || '资产分布'}
+            action={
+              assetDrillLevel === 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setAssetDrillLevel(0)}
+                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 transition-colors"
+                >
+                  <IconArrowLeft />
+                  <span>返回总览</span>
+                </button>
+              ) : undefined
+            }
+          >
+            <ReactECharts
+              option={getAssetDonutOption()}
+              style={{ height: 280 }}
+              onEvents={{ click: handleAssetDonutClick }}
+              opts={{ renderer: 'canvas' }}
+            />
+            <p className="text-center text-xs text-slate-400 mt-1">
+              {assetDrillLevel === 0
+                ? '点击类别查看子类别明细 →'
+                : `查看中: ${categories.find((c) => c.id === selectedCategoryId)?.name ?? ''} 子类别`}
+            </p>
+          </ChartCard>
+        );
+      }
+      if (type === 'chart_liability' || type === 'liability_structure') {
+        return (
+          <ChartCard title={widget.title || '负债结构（按期限）'}>
+            <ReactECharts
+              option={liabilityBarOption}
+              style={{ height: 280 }}
+              opts={{ renderer: 'canvas' }}
+            />
+            {rateLabelData.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {rateLabelData.map((r) => (
+                  <div
+                    key={r.name}
+                    className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-slate-50"
+                  >
+                    <span className="text-slate-600 truncate">{r.name}</span>
+                    <span className="text-amber-600 font-semibold ml-2">
+                      利率: {r.rate.toFixed(2)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ChartCard>
+        );
+      }
+      if (type === 'chart_trend' || type === 'cashflow_trend') {
+        return (
+          <ChartCard
+            title={widget.title || '资产负债趋势'}
+            action={
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                {(['3M', '6M', '1Y'] as TrendRange[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setTrendRange(r)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${trendRange === r ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            <ReactECharts
+              option={getTrendOption()}
+              style={{ height: 280 }}
+              opts={{ renderer: 'canvas' }}
+            />
+          </ChartCard>
+        );
+      }
+      if (type === 'accounts_list' || type === 'holdings_overview') {
+        const assetAccounts = accounts.filter((a) => a.type === 'asset');
+        return (
+          <ChartCard title={widget.title || '账户列表'}>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {assetAccounts.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">暂无账户数据</p>
+              ) : (
+                assetAccounts.map((a) => {
+                  const cat = categories.find((c) => c.id === a.category_id);
+                  return (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between text-sm px-3 py-2 bg-slate-50 rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-700">{a.name}</p>
+                        <p className="text-xs text-slate-400">{cat?.name ?? '未知分类'}</p>
+                      </div>
+                      <span className="font-semibold text-slate-700">
+                        ¥{a.balance.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </ChartCard>
+        );
+      }
+      if (type === 'liabilities_list') {
+        return (
+          <ChartCard title={widget.title || '负债列表'}>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {liabilityAccounts.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">暂无负债数据</p>
+              ) : (
+                liabilityAccounts.map((a) => {
+                  const cat = categories.find((c) => c.id === a.category_id);
+                  return (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between text-sm px-3 py-2 bg-slate-50 rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-700">{a.name}</p>
+                        <p className="text-xs text-slate-400">{cat?.name ?? '未知分类'}</p>
+                      </div>
+                      <span className="font-semibold text-rose-600">
+                        ¥{a.balance.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </ChartCard>
+        );
+      }
+      if (type === 'holdings_performance' || type === 'profit_summary') {
+        const sorted = [...holdings].sort((a, b) => b.current_value - a.current_value);
+        return (
+          <ChartCard title={widget.title || '持仓表现'}>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {sorted.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">暂无持仓数据</p>
+              ) : (
+                sorted.slice(0, 10).map((h) => {
+                  const pnlPct = h.cost_basis > 0 ? (h.unrealized_pnl / h.cost_basis) * 100 : 0;
+                  return (
+                    <div
+                      key={h.id}
+                      className="flex items-center justify-between text-sm px-3 py-2 bg-slate-50 rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-700">{h.name}</p>
+                        <p className="text-xs text-slate-400">
+                          成本: ¥
+                          {h.cost_basis.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-slate-700">
+                          ¥{h.current_value.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                        </p>
+                        <p
+                          className={`text-xs font-medium ${h.unrealized_pnl >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                        >
+                          {h.unrealized_pnl >= 0 ? '+' : ''}
+                          {pnlPct.toFixed(2)}%
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </ChartCard>
+        );
+      }
+      if (type === 'insurance_summary') {
+        return (
+          <ChartCard title={widget.title || '保险保障'}>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-blue-50 rounded-xl p-3 text-center">
+                <p className="text-xs text-blue-600 font-medium">总保费</p>
+                <p className="text-base font-bold text-blue-700 mt-1">
+                  ¥{totalPremium.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[10px] text-blue-400 mt-0.5">
+                  {activeInsuranceCount} 份有效保单
+                </p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-3 text-center">
+                <p className="text-xs text-amber-600 font-medium">总保额</p>
+                <p className="text-base font-bold text-amber-700 mt-1">
+                  ¥{totalCoverage.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[10px] text-amber-400 mt-0.5">风险保障总额</p>
+              </div>
+              <div
+                className={`${renewalSoon > 0 ? 'bg-red-50' : 'bg-emerald-50'} rounded-xl p-3 text-center`}
+              >
+                <p
+                  className={`text-xs ${renewalSoon > 0 ? 'text-red-600' : 'text-emerald-600'} font-medium`}
+                >
+                  待续保
+                </p>
+                <p
+                  className={`text-base font-bold ${renewalSoon > 0 ? 'text-red-700' : 'text-emerald-700'} mt-1`}
+                >
+                  {renewalSoon}
+                </p>
+                <p
+                  className={`text-[10px] ${renewalSoon > 0 ? 'text-red-400' : 'text-emerald-400'} mt-0.5`}
+                >
+                  {renewalSoon > 0 ? '30天内需续保' : '暂无续保提醒'}
+                </p>
+              </div>
+            </div>
+          </ChartCard>
+        );
+      }
+      if (type === 'chart_invest_return') {
+        const sorted = [...holdings].sort((a, b) =>
+          (a.last_price_update ?? '').localeCompare(b.last_price_update ?? '')
+        );
+        const labels = sorted.slice(-6).map((h) => h.name.slice(0, 6));
+        const investTrendOption: EChartsOption = {
+          tooltip: { trigger: 'axis' },
+          legend: {
+            data: ['市值', '成本'],
+            bottom: 0,
+            textStyle: { fontSize: 12, color: '#64748b' },
+          },
+          grid: { left: '3%', right: '4%', bottom: '18%', top: '8%', containLabel: true },
+          xAxis: {
+            type: 'category',
+            data: labels,
+            axisLabel: { fontSize: 11, color: '#94a3b8', rotate: 15 },
+            axisLine: { lineStyle: { color: '#e2e8f0' } },
+          },
+          yAxis: {
+            type: 'value',
+            axisLabel: {
+              formatter: (v: number) => `¥${(v / 10000).toFixed(1)}万`,
+              fontSize: 11,
+              color: '#94a3b8',
+            },
+            splitLine: { lineStyle: { color: '#f1f5f9' } },
+          },
+          series: [
+            {
+              name: '市值',
+              type: 'bar',
+              data: sorted.slice(-6).map((h) => h.current_value),
+              itemStyle: { color: '#4f46e5' },
+            },
+            {
+              name: '成本',
+              type: 'bar',
+              data: sorted.slice(-6).map((h) => h.cost_basis),
+              itemStyle: { color: '#94a3b8' },
+            },
+          ],
+        };
+        return (
+          <ChartCard title={widget.title || '投资收益趋势'}>
+            <ReactECharts
+              option={investTrendOption}
+              style={{ height: 280 }}
+              opts={{ renderer: 'canvas' }}
+            />
+          </ChartCard>
+        );
+      }
+      if (type === 'chart_holdings_rank') {
+        const sortedRank = [...holdings]
+          .sort((a, b) => b.current_value - a.current_value)
+          .slice(0, 10);
+        const holdingsRankOption: EChartsOption = {
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          grid: { left: '3%', right: '4%', bottom: '3%', top: '3%', containLabel: true },
+          xAxis: {
+            type: 'value',
+            axisLabel: {
+              formatter: (v: number) => `¥${(v / 10000).toFixed(0)}万`,
+              fontSize: 10,
+              color: '#94a3b8',
+            },
+            splitLine: { lineStyle: { color: '#f1f5f9' } },
+          },
+          yAxis: {
+            type: 'category',
+            data: sortedRank.map((h) => h.name.slice(0, 8)).reverse(),
+            axisLabel: { fontSize: 10, color: '#64748b' },
+          },
+          series: [
+            {
+              name: '市值',
+              type: 'bar',
+              data: sortedRank.map((h) => h.current_value).reverse(),
+              itemStyle: { color: '#10b981' },
+              barWidth: '60%',
+            },
+          ],
+        };
+        return (
+          <ChartCard title={widget.title || '持仓排名'}>
+            <ReactECharts
+              option={holdingsRankOption}
+              style={{ height: 280 }}
+              opts={{ renderer: 'canvas' }}
+            />
+          </ChartCard>
+        );
+      }
+      if (type === 'table_transactions') {
+        const recentTxs = transactions.slice(0, 10);
+        return (
+          <ChartCard title={widget.title || '近期交易'}>
+            <div className="h-full overflow-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-slate-500 border-b border-slate-100">
+                    <th className="text-left py-2 font-medium">日期</th>
+                    <th className="text-right py-2 font-medium">金额</th>
+                    <th className="text-left py-2 font-medium">类型</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentTxs.map((tx) => (
+                    <tr key={tx.id} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="py-1.5 text-slate-600">{tx.transaction_date}</td>
+                      <td
+                        className={`py-1.5 text-right font-medium ${tx.transaction_type === 'income' ? 'text-emerald-600' : 'text-slate-700'}`}
+                      >
+                        {tx.transaction_type === 'income' ? '+' : '-'}
+                        {tx.amount.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                      </td>
+                      <td className="py-1.5 text-slate-400">
+                        {tx.transaction_type === 'income'
+                          ? '收入'
+                          : tx.transaction_type === 'expense'
+                            ? '支出'
+                            : '转账'}
+                      </td>
+                    </tr>
+                  ))}
+                  {recentTxs.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="text-center text-slate-400 py-4">
+                        暂无交易数据
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </ChartCard>
+        );
+      }
+      if (type === 'table_reminders') {
+        return (
+          <ChartCard title={widget.title || '待办提醒'}>
+            <div className="flex flex-col items-center justify-center h-32 text-slate-400 text-sm">
+              <span className="text-3xl mb-2">🔔</span>
+              <p>暂无提醒数据</p>
+            </div>
+          </ChartCard>
+        );
+      }
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center text-sm text-slate-400">
+          暂不支持此组件: {type}
+        </div>
+      );
+    },
+    [
+      netWorth,
+      totalAssets,
+      totalLiabilities,
+      debtToAsset,
+      monthlyCashFlow,
+      cashFlowPositive,
+      monthlyIncome,
+      monthlyExpense,
+      totalMarketValue,
+      totalUnrealizedPnl,
+      getAssetDonutOption,
+      handleAssetDonutClick,
+      assetDrillLevel,
+      selectedCategoryId,
+      categories,
+      liabilityBarOption,
+      rateLabelData,
+      getTrendOption,
+      trendRange,
+      accounts,
+      liabilityAccounts,
+      holdings,
+      totalPremium,
+      totalCoverage,
+      activeInsuranceCount,
+      renewalSoon,
+    ]
+  );
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -907,8 +1513,6 @@ export default function Dashboard() {
     );
   }
 
-  const netWorthPositive = netWorth >= 0;
-  const cashFlowPositive = monthlyCashFlow >= 0;
   const encouragingMessage =
     netWorthPositive && monthlyCashFlow >= 0
       ? '太棒了！今日收支状况良好 🎉'
@@ -921,7 +1525,9 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">财务仪表盘</h1>
-          <p className="text-sm text-slate-500 mt-1">实时掌握您的财务健康状况</p>
+          <p className="text-sm text-slate-500 mt-1">
+            {activeLayout ? `当前布局: ${activeLayout.name}` : '实时掌握您的财务健康状况'}
+          </p>
         </div>
         <div className="text-right text-xs text-slate-400">
           <p>数据更新于 {new Date().toLocaleDateString('zh-CN')}</p>
@@ -931,246 +1537,298 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
-        <div
-          className="col-span-1 relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
-          style={{
-            background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-            boxShadow: '0 8px 32px -8px rgba(99,102,241,0.45)',
-          }}
-        >
-          <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
-            <IconPiggy />
-          </div>
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="opacity-80">
+      {activeLayout ? (
+        (() => {
+          const rows: { y: number; items: { layout: LayoutItem; widget: WidgetConfig }[] }[] = [];
+          for (const item of activeLayout.layout) {
+            const widget = activeLayout.widgets.find((w) => w.id === item.i);
+            if (!widget) continue;
+            const row = rows.find((r) => r.y === item.y);
+            if (row) row.items.push({ layout: item, widget });
+            else
+              rows.push({
+                y: item.y,
+                items: [{ layout: item, widget }],
+              });
+          }
+          rows.sort((a, b) => a.y - b.y);
+
+          return rows.map((row) => {
+            const isKpiRow = row.items.length === 5 && row.items.every((i) => i.layout.w === 3);
+            if (isKpiRow) {
+              return (
+                <div key={`row-${row.y}`} className="grid grid-cols-5 gap-4">
+                  {row.items.map(({ layout, widget }) => (
+                    <div key={layout.i} className="col-span-1">
+                      {renderWidget(widget)}
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+            return (
+              <div key={`row-${row.y}`} className="grid grid-cols-2 gap-5">
+                {row.items.map(({ layout, widget }) => {
+                  const spanClass = layout.w >= 8 ? 'col-span-2' : 'col-span-1';
+                  return (
+                    <div key={layout.i} className={spanClass}>
+                      {renderWidget(widget)}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          });
+        })()
+      ) : (
+        <>
+          <div className="grid grid-cols-5 gap-4">
+            <div
+              className="col-span-1 relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+              style={{
+                background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                boxShadow: '0 8px 32px -8px rgba(99,102,241,0.45)',
+              }}
+            >
+              <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
                 <IconPiggy />
               </div>
-              <p className="text-sm font-medium opacity-90">净资产</p>
-              {2.3 >= 0 && (
-                <span className="ml-auto flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-md bg-white/20">
-                  <IconTrendUp />
-                  {Math.abs(2.3).toFixed(1)}%
-                </span>
-              )}
-            </div>
-            <p className="text-5xl font-black tracking-tighter leading-none">
-              ¥{netWorth.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}
-            </p>
-            {netWorthPositive ? (
-              <p className="text-[10px] mt-2 opacity-80 flex items-center gap-1">
-                <span>📈</span> 净资产稳健增长中
-              </p>
-            ) : (
-              <p className="text-[10px] mt-2 opacity-80 flex items-center gap-1">
-                <span>💡</span> 负债优化中，继续加油
-              </p>
-            )}
-            <div className="mt-2 pt-2 border-t border-white/20">
-              <p className="text-[10px] opacity-70">资产 - 负债</p>
-              <p className="text-xs font-semibold">
-                ¥{totalAssets.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} - ¥
-                {totalLiabilities.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <KpiCard
-          label="总资产"
-          value={`¥${totalAssets.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
-          icon={<IconBuilding />}
-          gradientFrom="#10b981"
-          gradientTo="#059669"
-          shadowColor="rgba(16,185,129,0.35)"
-          trend={3.1}
-        />
-        <KpiCard
-          label="总负债"
-          value={`¥${totalLiabilities.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
-          icon={<IconCard />}
-          gradientFrom="#f43f5e"
-          gradientTo="#e11d48"
-          shadowColor="rgba(244,63,94,0.35)"
-          trend={-1.2}
-        />
-        <KpiCard
-          label="负债资产比"
-          value={`${debtToAsset.toFixed(1)}%`}
-          icon={<IconChart />}
-          gradientFrom="#8b5cf6"
-          gradientTo="#7c3aed"
-          shadowColor="rgba(139,92,246,0.35)"
-          subValue={debtToAsset < 50 ? '健康' : debtToAsset < 80 ? '警戒' : '危险'}
-          subLabel="财务状况"
-        />
-        <KpiCard
-          label="月现金流"
-          value={`¥${monthlyCashFlow.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
-          icon={<IconTrendUp />}
-          gradientFrom={cashFlowPositive ? '#0ea5e9' : '#f97316'}
-          gradientTo={cashFlowPositive ? '#0284c7' : '#ea580c'}
-          shadowColor={cashFlowPositive ? 'rgba(14,165,233,0.35)' : 'rgba(249,115,22,0.35)'}
-          subValue={`收入¥${monthlyIncome.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} / 支出¥${monthlyExpense.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`}
-          subLabel="本月收支"
-        />
-      </div>
-
-      {/* Insurance Section */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-lg">🛡️</span>
-          <h2 className="text-base font-semibold text-slate-700">保险保障</h2>
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div
-            className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
-            style={{
-              background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-              boxShadow: '0 8px 32px -8px rgba(14,165,233,0.45)',
-            }}
-          >
-            <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
-              <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
-            </div>
-            <div className="relative">
-              <p className="text-sm font-medium opacity-90 mb-1">总保费</p>
-              <p className="text-2xl font-bold tracking-tight">
-                ¥{totalPremium.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}
-              </p>
-              <p className="text-[10px] mt-1 opacity-70">
-                {activeInsuranceCount} 份有效保单
-              </p>
-            </div>
-          </div>
-
-          <div
-            className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
-            style={{
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              boxShadow: '0 8px 32px -8px rgba(245,158,11,0.45)',
-            }}
-          >
-            <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
-              <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
-            </div>
-            <div className="relative">
-              <p className="text-sm font-medium opacity-90 mb-1">总保额</p>
-              <p className="text-2xl font-bold tracking-tight">
-                ¥{totalCoverage.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-[10px] mt-1 opacity-70">
-                风险保障总额
-              </p>
-            </div>
-          </div>
-          <div
-            className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
-            style={{
-              background: renewalSoon > 0
-                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-                : 'linear-gradient(135deg, #10b981, #059669)',
-              boxShadow: renewalSoon > 0 ? '0 8px 32px -8px rgba(239,68,68,0.45)' : '0 8px 32px -8px rgba(16,185,129,0.45)',
-            }}
-          >
-            <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
-              <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
-            </div>
-            <div className="relative">
-              <p className="text-sm font-medium opacity-90 mb-1">待续保</p>
-              <p className="text-2xl font-bold tracking-tight">{renewalSoon}</p>
-              <p className="text-[10px] mt-1 opacity-70">
-                {renewalSoon > 0 ? '30天内需要续保' : '暂无续保提醒'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {(netWorthPositive || cashFlowPositive) && (
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100">
-          <span className="text-base">{netWorthPositive ? '✨' : '💡'}</span>
-          <p className="text-sm text-indigo-700 font-medium">{encouragingMessage}</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-5">
-        <ChartCard
-          title="资产分布"
-          action={
-            assetDrillLevel === 1 ? (
-              <button
-                type="button"
-                onClick={() => setAssetDrillLevel(0)}
-                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 transition-colors"
-              >
-                <IconArrowLeft />
-                <span>返回总览</span>
-              </button>
-            ) : undefined
-          }
-        >
-          <ReactECharts
-            option={getAssetDonutOption()}
-            style={{ height: 280 }}
-            onEvents={{ click: handleAssetDonutClick }}
-            opts={{ renderer: 'canvas' }}
-          />
-          <p className="text-center text-xs text-slate-400 mt-1">
-            {assetDrillLevel === 0
-              ? '点击类别查看子类别明细 →'
-              : `查看中: ${categories.find((c) => c.id === selectedCategoryId)?.name ?? ''} 子类别`}
-          </p>
-        </ChartCard>
-
-        <ChartCard title="负债结构（按期限）">
-          <ReactECharts
-            option={liabilityBarOption}
-            style={{ height: 280 }}
-            opts={{ renderer: 'canvas' }}
-          />
-          {rateLabelData.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {rateLabelData.map((r) => (
-                <div
-                  key={r.name}
-                  className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-slate-50"
-                >
-                  <span className="text-slate-600 truncate">{r.name}</span>
-                  <span className="text-amber-600 font-semibold ml-2">
-                    利率: {r.rate.toFixed(2)}%
-                  </span>
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="opacity-80">
+                    <IconPiggy />
+                  </div>
+                  <p className="text-sm font-medium opacity-90">净资产</p>
+                  {2.3 >= 0 && (
+                    <span className="ml-auto flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-md bg-white/20">
+                      <IconTrendUp />
+                      {Math.abs(2.3).toFixed(1)}%
+                    </span>
+                  )}
                 </div>
-              ))}
+                <p className="text-4xl font-black tracking-tighter leading-none truncate">
+                  ¥{netWorth.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}
+                </p>
+                {netWorthPositive ? (
+                  <p className="text-[10px] mt-2 opacity-80 flex items-center gap-1">
+                    <span>📈</span> 净资产稳健增长中
+                  </p>
+                ) : (
+                  <p className="text-[10px] mt-2 opacity-80 flex items-center gap-1">
+                    <span>💡</span> 负债优化中，继续加油
+                  </p>
+                )}
+                <div className="mt-2 pt-2 border-t border-white/20">
+                  <p className="text-[10px] opacity-70">资产 - 负债</p>
+                  <p className="text-xs font-semibold">
+                    ¥{totalAssets.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} - ¥
+                    {totalLiabilities.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <KpiCard
+              label="总资产"
+              value={`¥${totalAssets.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+              icon={<IconBuilding />}
+              gradientFrom="#10b981"
+              gradientTo="#059669"
+              shadowColor="rgba(16,185,129,0.35)"
+              trend={3.1}
+            />
+            <KpiCard
+              label="总负债"
+              value={`¥${totalLiabilities.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+              icon={<IconCard />}
+              gradientFrom="#f43f5e"
+              gradientTo="#e11d48"
+              shadowColor="rgba(244,63,94,0.35)"
+              trend={-1.2}
+            />
+            <KpiCard
+              label="负债资产比"
+              value={`${debtToAsset.toFixed(1)}%`}
+              icon={<IconChart />}
+              gradientFrom="#8b5cf6"
+              gradientTo="#7c3aed"
+              shadowColor="rgba(139,92,246,0.35)"
+              subValue={debtToAsset < 50 ? '健康' : debtToAsset < 80 ? '警戒' : '危险'}
+              subLabel="财务状况"
+            />
+            <KpiCard
+              label="月现金流"
+              value={`¥${monthlyCashFlow.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`}
+              icon={<IconTrendUp />}
+              gradientFrom={cashFlowPositive ? '#0ea5e9' : '#f97316'}
+              gradientTo={cashFlowPositive ? '#0284c7' : '#ea580c'}
+              shadowColor={cashFlowPositive ? 'rgba(14,165,233,0.35)' : 'rgba(249,115,22,0.35)'}
+              subValue={`收入¥${monthlyIncome.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} / 支出¥${monthlyExpense.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`}
+              subLabel="本月收支"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-lg">🛡️</span>
+              <h2 className="text-base font-semibold text-slate-700">保险保障</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div
+                className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                  boxShadow: '0 8px 32px -8px rgba(14,165,233,0.45)',
+                }}
+              >
+                <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
+                  <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" />
+                  </svg>
+                </div>
+                <div className="relative">
+                  <p className="text-sm font-medium opacity-90 mb-1">总保费</p>
+                  <p className="text-2xl font-bold tracking-tight">
+                    ¥{totalPremium.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] mt-1 opacity-70">{activeInsuranceCount} 份有效保单</p>
+                </div>
+              </div>
+
+              <div
+                className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  boxShadow: '0 8px 32px -8px rgba(245,158,11,0.45)',
+                }}
+              >
+                <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
+                  <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" />
+                  </svg>
+                </div>
+                <div className="relative">
+                  <p className="text-sm font-medium opacity-90 mb-1">总保额</p>
+                  <p className="text-2xl font-bold tracking-tight">
+                    ¥{totalCoverage.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[10px] mt-1 opacity-70">风险保障总额</p>
+                </div>
+              </div>
+              <div
+                className="relative overflow-hidden rounded-2xl p-5 text-white shadow-lg"
+                style={{
+                  background:
+                    renewalSoon > 0
+                      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                      : 'linear-gradient(135deg, #10b981, #059669)',
+                  boxShadow:
+                    renewalSoon > 0
+                      ? '0 8px 32px -8px rgba(239,68,68,0.45)'
+                      : '0 8px 32px -8px rgba(16,185,129,0.45)',
+                }}
+              >
+                <div className="absolute -top-4 -right-4 w-40 h-40 opacity-10">
+                  <svg width="160" height="160" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z" />
+                  </svg>
+                </div>
+                <div className="relative">
+                  <p className="text-sm font-medium opacity-90 mb-1">待续保</p>
+                  <p className="text-2xl font-bold tracking-tight">{renewalSoon}</p>
+                  <p className="text-[10px] mt-1 opacity-70">
+                    {renewalSoon > 0 ? '30天内需要续保' : '暂无续保提醒'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {(netWorthPositive || cashFlowPositive) && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100">
+              <span className="text-base">{netWorthPositive ? '✨' : '💡'}</span>
+              <p className="text-sm text-indigo-700 font-medium">{encouragingMessage}</p>
             </div>
           )}
-        </ChartCard>
-      </div>
 
-      <ChartCard
-        title="资产负债趋势"
-        action={
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-            {(['3M', '6M', '1Y'] as TrendRange[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setTrendRange(r)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${trendRange === r ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                {r}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-5">
+            <ChartCard
+              title="资产分布"
+              action={
+                assetDrillLevel === 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setAssetDrillLevel(0)}
+                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <IconArrowLeft />
+                    <span>返回总览</span>
+                  </button>
+                ) : undefined
+              }
+            >
+              <ReactECharts
+                option={getAssetDonutOption()}
+                style={{ height: 280 }}
+                onEvents={{ click: handleAssetDonutClick }}
+                opts={{ renderer: 'canvas' }}
+              />
+              <p className="text-center text-xs text-slate-400 mt-1">
+                {assetDrillLevel === 0
+                  ? '点击类别查看子类别明细 →'
+                  : `查看中: ${categories.find((c) => c.id === selectedCategoryId)?.name ?? ''} 子类别`}
+              </p>
+            </ChartCard>
+
+            <ChartCard title="负债结构（按期限）">
+              <ReactECharts
+                option={liabilityBarOption}
+                style={{ height: 280 }}
+                opts={{ renderer: 'canvas' }}
+              />
+              {rateLabelData.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {rateLabelData.map((r) => (
+                    <div
+                      key={r.name}
+                      className="flex items-center justify-between text-xs px-2 py-1 rounded-lg bg-slate-50"
+                    >
+                      <span className="text-slate-600 truncate">{r.name}</span>
+                      <span className="text-amber-600 font-semibold ml-2">
+                        利率: {r.rate.toFixed(2)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ChartCard>
           </div>
-        }
-      >
-        <ReactECharts
-          option={getTrendOption()}
-          style={{ height: 280 }}
-          opts={{ renderer: 'canvas' }}
-        />
-      </ChartCard>
+
+          <ChartCard
+            title="资产负债趋势"
+            action={
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                {(['3M', '6M', '1Y'] as TrendRange[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setTrendRange(r)}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${trendRange === r ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            <ReactECharts
+              option={getTrendOption()}
+              style={{ height: 280 }}
+              opts={{ renderer: 'canvas' }}
+            />
+          </ChartCard>
+        </>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex items-center gap-1 px-5 pt-4 pb-0 bg-slate-50">

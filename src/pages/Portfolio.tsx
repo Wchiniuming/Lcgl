@@ -316,19 +316,31 @@ export default function Portfolio() {
                 <label htmlFor="filter-type" className="text-xs text-slate-400 font-medium">
                   筛选类型:
                 </label>
-                <select
-                  id="filter-type"
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as HoldingType | 'all')}
-                  className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="all">全部</option>
-                  {Object.entries(HOLDING_TYPE_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="filter-type"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value as HoldingType | 'all')}
+                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 pr-7 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="all">全部</option>
+                    {Object.entries(HOLDING_TYPE_LABELS).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                  {filterType !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterType('all')}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                      title="清除筛选"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="text-xs text-slate-400 font-medium">
                 💼 共 {holdingsWithMetrics.length} 个持仓
