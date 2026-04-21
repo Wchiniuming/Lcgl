@@ -15,6 +15,13 @@ struct AppState {
     db: Mutex<Connection>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BatchImportResult {
+    pub success: i64,
+    pub failed: i64,
+    pub ids: Vec<i64>,
+}
+
 // =============================================================================
 // UTILITY
 // =============================================================================
@@ -328,6 +335,188 @@ fn archive_account(state: tauri::State<AppState>, id: i64) -> Result<(), String>
     )
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// =============================================================================
+// BATCH IMPORT
+// =============================================================================
+
+#[tauri::command]
+fn batch_import_accounts(
+    state: tauri::State<AppState>,
+    accounts: Vec<Account>,
+) -> Result<BatchImportResult, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    conn.execute("BEGIN TRANSACTION", [])
+        .map_err(|e| e.to_string())?;
+
+    let mut success = 0i64;
+    let mut failed = 0i64;
+    let mut ids = Vec::new();
+
+    for account in accounts {
+        let result = conn.execute(
+            "INSERT INTO accounts (name, category_id, account_type, balance, currency, institution,
+                                   account_no, interest_rate, term_months, start_date, maturity_date,
+                                   payment_due_day, is_active, is_archived, notes, extra_data, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+            rusqlite::params![
+                account.name, account.category_id, account.account_type.to_string(),
+                account.balance, account.currency, account.institution, account.account_no,
+                account.interest_rate, account.term_months, account.start_date, account.maturity_date,
+                account.payment_due_day, 1, 0, account.notes, account.extra_data, now, now
+            ],
+        );
+
+        match result {
+            Ok(_) => {
+                success += 1;
+                ids.push(conn.last_insert_rowid());
+            }
+            Err(_) => {
+                failed += 1;
+            }
+        }
+    }
+
+    if failed > 0 {
+        conn.execute("ROLLBACK", []).map_err(|e| e.to_string())?;
+        return Err(format!("{} items failed to import", failed));
+    }
+
+    conn.execute("COMMIT", []).map_err(|e| e.to_string())?;
+    Ok(BatchImportResult {
+        success,
+        failed,
+        ids,
+    })
+}
+
+#[tauri::command]
+fn batch_import_holdings(
+    state: tauri::State<AppState>,
+    holdings: Vec<Holding>,
+) -> Result<BatchImportResult, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    conn.execute("BEGIN TRANSACTION", [])
+        .map_err(|e| e.to_string())?;
+
+    let mut success = 0i64;
+    let mut failed = 0i64;
+    let mut ids = Vec::new();
+
+    for holding in holdings {
+        let result = conn.execute(
+            "INSERT INTO holdings (symbol, name, holding_type, account_id, shares, cost_basis, avg_cost,
+                                   current_price, current_value, unrealized_pnl, realized_pnl, currency,
+                                   risk_level, purchase_date, last_price_update, is_active, is_archived,
+                                   notes, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 1, 0, ?16, ?17, ?17)",
+            rusqlite::params![
+                holding.symbol, holding.name, holding.holding_type.to_string(),
+                holding.account_id, holding.shares, holding.cost_basis, holding.avg_cost,
+                holding.current_price, holding.current_value, holding.unrealized_pnl,
+                holding.realized_pnl, holding.currency, holding.risk_level,
+                holding.purchase_date, holding.last_price_update, holding.notes, now
+            ],
+        );
+
+        match result {
+            Ok(_) => {
+                success += 1;
+                ids.push(conn.last_insert_rowid());
+            }
+            Err(_) => {
+                failed += 1;
+            }
+        }
+    }
+
+    if failed > 0 {
+        conn.execute("ROLLBACK", []).map_err(|e| e.to_string())?;
+        return Err(format!("{} items failed to import", failed));
+    }
+
+    conn.execute("COMMIT", []).map_err(|e| e.to_string())?;
+    Ok(BatchImportResult {
+        success,
+        failed,
+        ids,
+    })
+}
+
+#[tauri::command]
+fn batch_import_insurances(
+    state: tauri::State<AppState>,
+    insurances: Vec<Insurance>,
+) -> Result<BatchImportResult, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    conn.execute("BEGIN TRANSACTION", [])
+        .map_err(|e| e.to_string())?;
+
+    let mut success = 0i64;
+    let mut failed = 0i64;
+    let mut ids = Vec::new();
+
+    for insurance in insurances {
+        let result = conn.execute(
+            "INSERT INTO insurances (name, insurance_type, provider, policy_no, holder_name,
+                                     insured_name, beneficiary, premium, premium_frequency, coverage_amount,
+                                     coverage_type, coverage_detail, start_date, renewal_date, end_date,
+                                     status, notes, doc_path, is_renewal_reminder, is_active, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, 1, ?20, ?20)",
+            rusqlite::params![
+                insurance.name,
+                insurance.insurance_type,
+                insurance.provider,
+                insurance.policy_no,
+                insurance.holder_name,
+                insurance.insured_name,
+                insurance.beneficiary,
+                insurance.premium,
+                insurance.premium_frequency,
+                insurance.coverage_amount,
+                insurance.coverage_type,
+                insurance.coverage_detail,
+                insurance.start_date,
+                insurance.renewal_date,
+                insurance.end_date,
+                insurance.status,
+                insurance.notes,
+                insurance.doc_path,
+                insurance.is_renewal_reminder as i32,
+                now
+            ],
+        );
+
+        match result {
+            Ok(_) => {
+                success += 1;
+                ids.push(conn.last_insert_rowid());
+            }
+            Err(_) => {
+                failed += 1;
+            }
+        }
+    }
+
+    if failed > 0 {
+        conn.execute("ROLLBACK", []).map_err(|e| e.to_string())?;
+        return Err(format!("{} items failed to import", failed));
+    }
+
+    conn.execute("COMMIT", []).map_err(|e| e.to_string())?;
+    Ok(BatchImportResult {
+        success,
+        failed,
+        ids,
+    })
 }
 
 // =============================================================================
@@ -2063,6 +2252,10 @@ pub fn run() {
             create_insurance,
             update_insurance,
             delete_insurance,
+            // Batch Import
+            batch_import_accounts,
+            batch_import_holdings,
+            batch_import_insurances,
             // Settings
             get_settings,
             get_setting,

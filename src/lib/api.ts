@@ -1,4 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
+import type {
+  ValidatedAccount,
+  ValidatedHolding,
+  ValidatedInsurance,
+  ValidatedTransaction,
+} from './excel-schemas';
 
 export type AccountType = 'asset' | 'liability';
 export type TransactionType = 'income' | 'expense' | 'transfer' | 'adjustment';
@@ -336,6 +342,46 @@ export async function batchCreateTransactions(
     updated_at: '',
   }));
   return invoke<number[]>('batch_create_transactions', { transactions: normalized });
+}
+
+// Batch import result type
+export interface BatchImportResult {
+  success: number;
+  failed: number;
+  ids: number[];
+}
+
+// Conflict item detected between import data and existing database data
+export interface ImportConflictItem {
+  module: string;
+  rowIndex: number;
+  existingData: Record<string, unknown>;
+  importData: Record<string, unknown>;
+}
+
+// Batch import functions
+export async function batchImportAccounts(
+  accounts: ValidatedAccount[]
+): Promise<BatchImportResult> {
+  return invoke('batch_import_accounts', { accounts });
+}
+
+export async function batchImportHoldings(
+  holdings: ValidatedHolding[]
+): Promise<BatchImportResult> {
+  return invoke('batch_import_holdings', { holdings });
+}
+
+export async function batchImportInsurances(
+  insurances: ValidatedInsurance[]
+): Promise<BatchImportResult> {
+  return invoke('batch_import_insurances', { insurances });
+}
+
+export async function batchImportTransactions(
+  transactions: ValidatedTransaction[]
+): Promise<BatchImportResult> {
+  return invoke('batch_import_transactions', { transactions });
 }
 
 export interface GetHoldingsOptions {
