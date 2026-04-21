@@ -239,6 +239,7 @@ function KpiCard({
   trend,
   subValue,
   subLabel,
+  size = 'normal',
 }: {
   label: string;
   value: string;
@@ -249,6 +250,7 @@ function KpiCard({
   trend?: number;
   subValue?: string;
   subLabel?: string;
+  size?: 'normal' | 'xl';
 }) {
   return (
     <div
@@ -272,7 +274,11 @@ function KpiCard({
             </span>
           )}
         </div>
-        <p className="text-2xl font-bold tracking-tight">{value}</p>
+        <p
+          className={`${size === 'xl' ? 'text-4xl font-black tracking-tighter leading-none' : 'text-2xl font-bold'} tracking-tight truncate`}
+        >
+          {value}
+        </p>
         {subValue && (
           <div className="mt-2 pt-2 border-t border-white/20">
             <p className="text-xs opacity-70">{subLabel ?? '较上期'}</p>
@@ -1636,6 +1642,7 @@ export default function Dashboard() {
               gradientTo="#059669"
               shadowColor="rgba(16,185,129,0.35)"
               trend={3.1}
+              size="xl"
             />
             <KpiCard
               label="总负债"
@@ -1645,6 +1652,7 @@ export default function Dashboard() {
               gradientTo="#e11d48"
               shadowColor="rgba(244,63,94,0.35)"
               trend={-1.2}
+              size="xl"
             />
             <KpiCard
               label="负债资产比"

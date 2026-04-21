@@ -68,7 +68,9 @@ export default function ExcelImportWizard({ filePath, onComplete, onCancel }: Pr
     const loadFile = async () => {
       try {
         setLoading(true);
-        const workbook = XLSX.readFile(filePath);
+        const { readFile } = await import('@tauri-apps/plugin-fs');
+        const fileData = await readFile(filePath);
+        const workbook = XLSX.read(fileData);
         const sheetNames = workbook.SheetNames;
 
         const modules = detectModules(sheetNames);

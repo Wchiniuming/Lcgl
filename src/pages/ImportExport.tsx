@@ -189,7 +189,14 @@ export default function ImportExport() {
 
       alert('导出成功！');
     } catch (e) {
-      setExportError('导出失败: ' + (e as Error).message);
+      const err = e as Error;
+      console.error('Export failed:', err);
+      console.error('Error name:', err.name);
+      console.error('Error message:', err.message);
+      const errObj = e as Record<string, unknown>;
+      console.error('Error keys:', Object.keys(errObj));
+      console.error('Full error string:', JSON.stringify(e, null, 2));
+      setExportError('导出失败: ' + (err.message || JSON.stringify(e)));
     } finally {
       setExporting(false);
     }
