@@ -7,7 +7,6 @@ import ImportExport from './pages/ImportExport';
 import InvestmentDashboard from './pages/InvestmentDashboard';
 import ProfitAnalysis from './pages/ProfitAnalysis';
 import Planning from './pages/Planning';
-import CustomDashboard from './pages/CustomDashboard';
 import Insurance from './pages/Insurance';
 import './App.css';
 
@@ -91,13 +90,6 @@ const navGroups = [
         label: '规划中心',
         icon: '🧭',
         description: '理财目标与再平衡',
-        badge: null,
-      },
-      {
-        path: '/custom-dashboard',
-        label: '自定义看板',
-        icon: '🧩',
-        description: '打造专属视图',
         badge: null,
       },
     ],
@@ -270,7 +262,6 @@ function App() {
             <Route path="/insurance" element={<Insurance />} />
             <Route path="/import-export" element={<ImportExport />} />
             <Route path="/profit-analysis" element={<ProfitAnalysis />} />
-            <Route path="/custom-dashboard" element={<CustomDashboard />} />
             <Route path="/planning" element={<Planning />} />
           </Routes>
         </main>
