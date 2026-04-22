@@ -468,9 +468,17 @@ export default function Accounts() {
 
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">资产负债管理</h1>
-            <p className="text-sm text-slate-500 mt-1">管理您的资产与负债账户</p>
+          <div className="flex items-center gap-4">
+            <img
+              src="/mascot1.png"
+              alt="吉祥物"
+              className="w-16 h-16 object-contain"
+              style={{ filter: 'drop-shadow(0 4px 8px rgba(99,102,241,0.25))' }}
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">资产负债管理</h1>
+              <p className="text-sm text-slate-500 mt-1">管理您的资产与负债账户</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button

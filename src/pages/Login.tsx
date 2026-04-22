@@ -3,69 +3,19 @@ import { checkPassword, hasPassword, setPassword } from '../lib/api';
 
 function LogoIcon() {
   return (
-    <svg
-      width="44"
-      height="44"
-      viewBox="0 0 44 44"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <circle cx="22" cy="22" r="22" fill="url(#loginLogoGrad)" />
-      <rect x="11" y="23" width="5" height="11" rx="1.5" fill="white" fillOpacity="0.7" />
-      <rect x="19.5" y="17" width="5" height="17" rx="1.5" fill="white" fillOpacity="0.85" />
-      <rect x="28" y="11" width="5" height="23" rx="1.5" fill="white" />
-      <defs>
-        <linearGradient
-          id="loginLogoGrad"
-          x1="0"
-          y1="0"
-          x2="44"
-          y2="44"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#818cf8" />
-          <stop offset="1" stopColor="#6366f1" />
-        </linearGradient>
-      </defs>
-    </svg>
+    <img src="/logo.png" width="44" height="44" alt="Lcgl Logo" style={{ objectFit: 'contain' }} />
   );
 }
 
 function MascotFace() {
   return (
-    <svg
+    <img
+      src="/mascot1.png"
       width="64"
       height="64"
-      viewBox="0 0 64 64"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      style={{ filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.4))' }}
-    >
-      <circle cx="32" cy="32" r="30" fill="url(#mFaceGrad)" />
-      <circle cx="22" cy="27" r="4" fill="white" />
-      <circle cx="42" cy="27" r="4" fill="white" />
-      <circle cx="23.5" cy="27" r="2" fill="#4f46e5" />
-      <circle cx="43.5" cy="27" r="2" fill="#4f46e5" />
-      <circle cx="25" cy="25" r="1" fill="white" />
-      <circle cx="45" cy="25" r="1" fill="white" />
-      <path
-        d="M22 40 Q32 50 42 40"
-        stroke="white"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="16" cy="37" r="4" fill="rgba(255,182,193,0.4)" />
-      <circle cx="48" cy="37" r="4" fill="rgba(255,182,193,0.4)" />
-      <defs>
-        <linearGradient id="mFaceGrad" x1="2" y1="2" x2="62" y2="62" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#a5b4fc" />
-          <stop offset="1" stopColor="#818cf8" />
-        </linearGradient>
-      </defs>
-    </svg>
+      alt="吉祥物"
+      style={{ objectFit: 'contain', filter: 'drop-shadow(0 8px 24px rgba(99,102,241,0.4))' }}
+    />
   );
 }
 

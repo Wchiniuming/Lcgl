@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import * as echarts from 'echarts';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   Account,
   AccountCategory,
@@ -18,6 +19,7 @@ import {
   getHoldings,
   getSettings,
   setSetting,
+  deleteTransaction,
 } from '../lib/api';
 
 type TrendRange = '3M' | '6M' | '1Y';
@@ -679,6 +681,20 @@ export default function Dashboard() {
 
   const recentTxs = transactions.slice(0, 8);
 
+  const handleDeleteTransaction = async (id: number) => {
+    const confirmed = await ask('确定要删除这条交易记录吗？', {
+      title: '确认删除',
+      kind: 'warning',
+    });
+    if (!confirmed) return;
+    try {
+      await deleteTransaction(id);
+      setTransactions((prev) => prev.filter((tx) => tx.id !== id));
+    } catch (err) {
+      console.error('删除交易记录失败', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -694,12 +710,20 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-4">
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">财务仪表盘</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {accounts.length} 个账户 · {transactions.length} 笔交易 · 更新于{' '}
-            {new Date().toLocaleDateString('zh-CN')}
-          </p>
+        <div className="flex items-center gap-4">
+          <img
+            src="/mascot2.png"
+            alt="吉祥物"
+            className="w-16 h-16 object-contain"
+            style={{ filter: 'drop-shadow(0 4px 8px rgba(99,102,241,0.25))' }}
+          />
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">财务仪表盘</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {accounts.length} 个账户 · {transactions.length} 笔交易 · 更新于{' '}
+              {new Date().toLocaleDateString('zh-CN')}
+            </p>
+          </div>
         </div>
         <select
           value={activeTemplate}
@@ -919,12 +943,13 @@ export default function Dashboard() {
                     <th className="text-left py-1.5 font-medium">日期</th>
                     <th className="text-right py-1.5 font-medium">金额</th>
                     <th className="text-left py-1.5 font-medium">类型</th>
+                    <th className="w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentTxs.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="text-center text-slate-400 py-4">
+                      <td colSpan={4} className="text-center text-slate-400 py-4">
                         暂无交易数据
                       </td>
                     </tr>
@@ -944,6 +969,28 @@ export default function Dashboard() {
                             : tx.transaction_type === 'expense'
                               ? '支出'
                               : '转账'}
+                        </td>
+                        <td className="py-1.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTransaction(tx.id)}
+                            className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                            title="删除"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
+                          </button>
                         </td>
                       </tr>
                     ))

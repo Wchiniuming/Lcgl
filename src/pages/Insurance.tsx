@@ -243,9 +243,17 @@ export default function InsurancePage() {
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">保险管理</h1>
-          <p className="text-sm text-slate-500 mt-1">管理您的保险保单</p>
+        <div className="flex items-center gap-4">
+          <img
+            src="/mascot3.png"
+            alt="吉祥物"
+            className="w-16 h-16 object-contain"
+            style={{ filter: 'drop-shadow(0 4px 8px rgba(99,102,241,0.25))' }}
+          />
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">保险管理</h1>
+            <p className="text-sm text-slate-500 mt-1">管理您的保险保单</p>
+          </div>
         </div>
         <button
           onClick={() => handleOpenForm()}

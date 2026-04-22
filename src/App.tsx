@@ -109,45 +109,13 @@ const navGroups = [
 
 function MascotSmile() {
   return (
-    <svg
+    <img
+      src="/mascot1.png"
       width="48"
       height="48"
-      viewBox="0 0 48 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      style={{ filter: 'drop-shadow(0 4px 8px rgba(99,102,241,0.25))' }}
-    >
-      <circle cx="24" cy="24" r="22" fill="url(#mascotGrad)" />
-      <circle cx="17" cy="20" r="3" fill="white" />
-      <circle cx="31" cy="20" r="3" fill="white" />
-      <circle cx="18" cy="20" r="1.5" fill="#4f46e5" />
-      <circle cx="32" cy="20" r="1.5" fill="#4f46e5" />
-      <circle cx="19.5" cy="18.5" r="0.7" fill="white" />
-      <circle cx="33.5" cy="18.5" r="0.7" fill="white" />
-      <path
-        d="M17 29 Q24 36 31 29"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="13" cy="27" r="3" fill="rgba(255,182,193,0.35)" />
-      <circle cx="35" cy="27" r="3" fill="rgba(255,182,193,0.35)" />
-      <defs>
-        <linearGradient
-          id="mascotGrad"
-          x1="2"
-          y1="2"
-          x2="46"
-          y2="46"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#818cf8" />
-          <stop offset="1" stopColor="#6366f1" />
-        </linearGradient>
-      </defs>
-    </svg>
+      alt="吉祥物"
+      style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 8px rgba(99,102,241,0.25))' }}
+    />
   );
 }
 
@@ -192,32 +160,7 @@ function NavItem({
 
 function Logo() {
   return (
-    <svg
-      width="36"
-      height="36"
-      viewBox="0 0 36 36"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <circle cx="18" cy="18" r="18" fill="url(#logoGradient)" />
-      <rect x="9" y="18" width="4" height="9" rx="1" fill="white" fillOpacity="0.7" />
-      <rect x="16" y="13" width="4" height="14" rx="1" fill="white" fillOpacity="0.85" />
-      <rect x="23" y="8" width="4" height="19" rx="1" fill="white" />
-      <defs>
-        <linearGradient
-          id="logoGradient"
-          x1="0"
-          y1="0"
-          x2="36"
-          y2="36"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop stopColor="#6366f1" />
-          <stop offset="1" stopColor="#4f46e5" />
-        </linearGradient>
-      </defs>
-    </svg>
+    <img src="/logo.png" width="36" height="36" alt="Lcgl Logo" style={{ objectFit: 'contain' }} />
   );
 }
 

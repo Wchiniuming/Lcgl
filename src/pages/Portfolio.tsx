@@ -195,13 +195,21 @@ export default function Portfolio() {
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                💼 <span>投资组合</span>
-              </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Investment Portfolio · 总览您的财富增长
-              </p>
+            <div className="flex items-center gap-4">
+              <img
+                src="/mascot4.png"
+                alt="吉祥物"
+                className="w-16 h-16 object-contain"
+                style={{ filter: 'drop-shadow(0 4px 8px rgba(99,102,241,0.25))' }}
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  💼 <span>投资组合</span>
+                </h1>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Investment Portfolio · 总览您的财富增长
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
