@@ -655,6 +655,10 @@ export async function hasPassword(): Promise<boolean> {
   return invoke<boolean>('has_password');
 }
 
+export async function logout(): Promise<void> {
+  return invoke<void>('logout');
+}
+
 export async function createBackup(): Promise<BackupInfo> {
   return invoke<BackupInfo>('create_backup');
 }

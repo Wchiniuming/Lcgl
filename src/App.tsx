@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { hasPassword, logout as apiLogout } from './lib/api';
 import Dashboard from './pages/Dashboard';
 import Portfolio from './pages/Portfolio';
 import Accounts from './pages/Accounts';
@@ -8,6 +10,8 @@ import InvestmentDashboard from './pages/InvestmentDashboard';
 import ProfitAnalysis from './pages/ProfitAnalysis';
 import Planning from './pages/Planning';
 import Insurance from './pages/Insurance';
+import Settings from './pages/Settings';
+import Login from './pages/Login';
 import './App.css';
 
 const navGroups = [
@@ -90,6 +94,13 @@ const navGroups = [
         label: '规划中心',
         icon: '🧭',
         description: '理财目标与再平衡',
+        badge: null,
+      },
+      {
+        path: '/settings',
+        label: '系统设置',
+        icon: '⚙️',
+        description: '安全与备份设置',
         badge: null,
       },
     ],
@@ -211,6 +222,46 @@ function Logo() {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkComplete, setCheckComplete] = useState(false);
+  const [hasPass, setHasPass] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const hasP = await hasPassword();
+        setHasPass(hasP);
+      } catch {
+        setHasPass(true);
+      }
+      setCheckComplete(true);
+    }
+    checkAuth();
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await apiLogout();
+    } catch {}
+    setIsAuthenticated(false);
+  }, []);
+
+  const handleLoginSuccess = useCallback(() => {
+    setIsAuthenticated(true);
+  }, []);
+
+  if (!checkComplete) {
+    return (
+      <div className="min-h-screen bg-[#f8f9fc] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} hasPass={hasPass} />;
+  }
+
   return (
     <BrowserRouter>
       <div className="flex min-h-screen bg-[#f8f9fc]">
@@ -249,6 +300,12 @@ function App() {
           </div>
 
           <div className="px-5 py-3 border-t border-[#e8eaf0]">
+            <button
+              onClick={handleLogout}
+              className="w-full text-left text-xs text-[#9ca3af] hover:text-red-500 transition-colors mb-1"
+            >
+              退出登录
+            </button>
             <p className="text-xs text-[#9ca3af]">v1.0 · 100% 本地存储</p>
           </div>
         </nav>
@@ -263,6 +320,7 @@ function App() {
             <Route path="/import-export" element={<ImportExport />} />
             <Route path="/profit-analysis" element={<ProfitAnalysis />} />
             <Route path="/planning" element={<Planning />} />
+            <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
           </Routes>
         </main>
       </div>

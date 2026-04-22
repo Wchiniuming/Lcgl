@@ -138,9 +138,32 @@ function IconCheck() {
   );
 }
 
+function IconLogout() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
 type SettingsTab = 'security' | 'backup';
 
-export default function Settings() {
+interface SettingsProps {
+  onLogout?: () => void;
+}
+
+export default function Settings({ onLogout }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('security');
 
   const [hasPass, setHasPass] = useState<boolean | null>(null);
@@ -476,13 +499,24 @@ export default function Settings() {
                 <IconCheck />
                 <span className="text-emerald-600 font-medium">密码保护已启用</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setPasswordMode('change')}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium flex items-center gap-1.5"
-              >
-                <IconKey /> 修改密码
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPasswordMode('change')}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium flex items-center gap-1.5"
+                >
+                  <IconKey /> 修改密码
+                </button>
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium flex items-center gap-1.5"
+                  >
+                    <IconLogout /> 退出登录
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

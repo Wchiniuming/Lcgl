@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   getInsurances,
   createInsurance,
@@ -229,7 +230,7 @@ export default function InsurancePage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这条保险记录吗？')) return;
+    if (!(await ask('确定要删除这条保险记录吗？', { title: '确认删除', kind: 'warning' }))) return;
     try {
       await deleteInsurance(id);
       await loadData();

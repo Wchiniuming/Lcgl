@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ask } from '@tauri-apps/plugin-dialog';
 import QuickEntryModal from '../components/QuickEntryModal';
 import {
   Account,
@@ -337,7 +338,7 @@ export default function Accounts() {
   }
 
   async function handleDeleteAccount(id: number) {
-    if (!confirm('确定要删除该账户吗？')) return;
+    if (!(await ask('确定要删除该账户吗？', { title: '确认删除', kind: 'warning' }))) return;
     try {
       await deleteAccount(id);
       setSelectedAccount(null);
@@ -383,7 +384,13 @@ export default function Accounts() {
   }
 
   async function handleRestoreSnapshot(snapshot: Snapshot) {
-    if (!confirm(`确定要恢复到 ${snapshot.snapshot_date} 的快照吗？`)) return;
+    if (
+      !(await ask(`确定要恢复到 ${snapshot.snapshot_date} 的快照吗？`, {
+        title: '确认恢复',
+        kind: 'warning',
+      }))
+    )
+      return;
     try {
       if (snapshot.asset_breakdown) {
         const assets = JSON.parse(snapshot.asset_breakdown) as Array<{
@@ -413,7 +420,7 @@ export default function Accounts() {
   }
 
   async function handleDeleteSnapshot(id: number) {
-    if (!confirm('确定要删除该快照吗？')) return;
+    if (!(await ask('确定要删除该快照吗？', { title: '确认删除', kind: 'warning' }))) return;
     try {
       await deleteSnapshot(id);
       await loadData();

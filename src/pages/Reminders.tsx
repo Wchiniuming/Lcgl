@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ask } from '@tauri-apps/plugin-dialog';
 import {
   getPendingReminders,
   getAllAccounts,
@@ -145,7 +146,7 @@ export default function Reminders() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这条提醒吗？')) return;
+    if (!(await ask('确定要删除这条提醒吗？', { title: '确认删除', kind: 'warning' }))) return;
     try {
       await deleteReminder(id);
       await loadData();

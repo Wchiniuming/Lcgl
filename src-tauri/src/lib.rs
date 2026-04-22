@@ -13,6 +13,7 @@ use tauri::Manager;
 
 struct AppState {
     db: Mutex<Connection>,
+    authenticated: Mutex<bool>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -157,6 +158,7 @@ fn update_account_category(
 
 #[tauri::command]
 fn delete_account_category(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
@@ -315,6 +317,7 @@ fn update_account_balance(
 
 #[tauri::command]
 fn delete_account(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
@@ -696,6 +699,7 @@ fn update_transaction(
 
 #[tauri::command]
 fn delete_transaction(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
@@ -935,6 +939,7 @@ fn update_holding(state: tauri::State<AppState>, holding: Holding) -> Result<(),
 
 #[tauri::command]
 fn delete_holding(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
@@ -1194,6 +1199,7 @@ fn update_template(state: tauri::State<AppState>, template: Template) -> Result<
 
 #[tauri::command]
 fn delete_template(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
@@ -1328,6 +1334,7 @@ fn create_snapshot(state: tauri::State<AppState>, snapshot: Snapshot) -> Result<
 
 #[tauri::command]
 fn delete_snapshot(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM snapshots WHERE id = ?1", [id])
         .map_err(|e| e.to_string())?;
@@ -1576,6 +1583,7 @@ fn update_insurance(state: tauri::State<AppState>, insurance: Insurance) -> Resu
 
 #[tauri::command]
 fn delete_insurance(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -1766,6 +1774,7 @@ fn update_reminder(state: tauri::State<AppState>, reminder: Reminder) -> Result<
 
 #[tauri::command]
 fn delete_reminder(state: tauri::State<AppState>, id: i64) -> Result<(), String> {
+    require_auth(&state)?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
@@ -1902,6 +1911,16 @@ fn set_setting(
 
 #[tauri::command]
 fn delete_setting(state: tauri::State<AppState>, key: String) -> Result<(), String> {
+    require_auth(&state)?;
+
+    let protected_keys = ["login_attempts", "app_password", "schema_version"];
+    if protected_keys.contains(&key.as_str()) {
+        return Err("禁止删除系统安全设置".to_string());
+    }
+    if key.starts_with("audit_") {
+        return Err("禁止删除审计日志".to_string());
+    }
+
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM settings WHERE key = ?1", [&key])
         .map_err(|e| e.to_string())?;
@@ -1933,28 +1952,156 @@ fn verify_password(password: &str, hash: &str) -> Result<bool, String> {
         .is_ok())
 }
 
+fn check_rate_limit(conn: &Connection) -> Result<(), String> {
+    let result: Result<(String, String), _> = conn.query_row(
+        "SELECT value, updated_at FROM settings WHERE key = 'login_attempts'",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    );
+
+    match result {
+        Ok((value_str, last_attempt)) => {
+            let attempts: i32 = value_str.parse().unwrap_or(0);
+            let lockout_seconds = 900;
+            if attempts >= 5 {
+                let last =
+                    chrono::NaiveDateTime::parse_from_str(&last_attempt, "%Y-%m-%d %H:%M:%S")
+                        .map_err(|e| e.to_string())?;
+                let now = chrono::Utc::now().naive_utc();
+                let elapsed = (now - last).num_seconds();
+                if elapsed < lockout_seconds {
+                    let remaining = lockout_seconds - elapsed;
+                    return Err(format!("登录失败次数过多，请{}秒后重试", remaining));
+                }
+                let _ = conn.execute("DELETE FROM settings WHERE key = 'login_attempts'", []);
+            }
+        }
+        Err(rusqlite::Error::QueryReturnedNoRows) => {}
+        Err(e) => return Err(e.to_string()),
+    }
+    Ok(())
+}
+
+fn record_failed_login(conn: &Connection) -> Result<(), String> {
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let result: Result<String, _> = conn.query_row(
+        "SELECT value FROM settings WHERE key = 'login_attempts'",
+        [],
+        |row| row.get(0),
+    );
+
+    match result {
+        Ok(value_str) => {
+            let count: i32 = value_str.parse().unwrap_or(0);
+            conn.execute(
+                "UPDATE settings SET value = ?1, updated_at = ?2 WHERE key = 'login_attempts'",
+                rusqlite::params![(count + 1).to_string(), now],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            conn.execute(
+                "INSERT INTO settings (key, value, value_type, description, updated_at) VALUES ('login_attempts', '1', 'number', '登录失败次数', ?1)",
+                rusqlite::params![now],
+            ).map_err(|e| e.to_string())?;
+        }
+        Err(e) => return Err(e.to_string()),
+    }
+    Ok(())
+}
+
+fn clear_failed_logins(conn: &Connection) -> Result<(), String> {
+    conn.execute("DELETE FROM settings WHERE key = 'login_attempts'", [])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn require_auth(state: &tauri::State<AppState>) -> Result<(), String> {
+    let auth = state.authenticated.lock().map_err(|e| e.to_string())?;
+    if !*auth {
+        return Err("未认证，请先登录".to_string());
+    }
+    Ok(())
+}
+
+fn has_password_set(conn: &Connection) -> Result<bool, String> {
+    let count: i32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM settings WHERE key = 'app_password'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(count > 0)
+}
+
 #[tauri::command]
 fn check_password(state: tauri::State<AppState>, password: String) -> Result<bool, String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
+
+    check_rate_limit(&conn)?;
+
+    let has_pass = has_password_set(&conn)?;
+    if !has_pass {
+        return Err("未设置密码".to_string());
+    }
+
     let result = conn.query_row(
         "SELECT value FROM settings WHERE key = 'app_password'",
         [],
         |row| row.get::<_, String>(0),
     );
     match result {
-        Ok(stored_hash) => verify_password(&password, &stored_hash),
+        Ok(stored_hash) => {
+            let valid = verify_password(&password, &stored_hash);
+            match valid {
+                Ok(true) => {
+                    clear_failed_logins(&conn)?;
+                    let mut auth = state.authenticated.lock().map_err(|e| e.to_string())?;
+                    *auth = true;
+                    Ok(true)
+                }
+                Ok(false) => {
+                    record_failed_login(&conn)?;
+                    let _ = log_audit_event(&conn, "login_failed", "密码错误");
+                    Ok(false)
+                }
+                Err(e) => Err(e),
+            }
+        }
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
         Err(e) => Err(e.to_string()),
     }
 }
 
+fn log_audit_event(conn: &Connection, event_type: &str, description: &str) -> Result<(), String> {
+    let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let key = format!("audit_{}_{}", event_type, chrono::Utc::now().timestamp());
+    let value = serde_json::json!({
+        "description": description,
+        "timestamp": now
+    })
+    .to_string();
+    conn.execute(
+        "INSERT INTO settings (key, value, value_type, description, updated_at) VALUES (?1, ?2, 'string', ?3, ?4)",
+        rusqlite::params![key, value, description, now],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 fn set_password(state: tauri::State<AppState>, password: String) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+
+    let has_pass = has_password_set(&conn)?;
+    if has_pass {
+        require_auth(&state)?;
+    }
+
     if password.len() < 6 {
         return Err("密码长度不能少于6位".to_string());
     }
     let hash = hash_password(&password)?;
-    let conn = state.db.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value, value_type, description, updated_at)
@@ -1962,6 +2109,10 @@ fn set_password(state: tauri::State<AppState>, password: String) -> Result<(), S
         rusqlite::params![hash, now],
     )
     .map_err(|e| e.to_string())?;
+    let _ = log_audit_event(&conn, "password_change", "密码已修改");
+
+    let mut auth = state.authenticated.lock().map_err(|e| e.to_string())?;
+    *auth = true;
     Ok(())
 }
 
@@ -1976,6 +2127,13 @@ fn has_password(state: tauri::State<AppState>) -> Result<bool, String> {
         )
         .map_err(|e| e.to_string())?;
     Ok(count > 0)
+}
+
+#[tauri::command]
+fn logout(state: tauri::State<AppState>) -> Result<(), String> {
+    let mut auth = state.authenticated.lock().map_err(|e| e.to_string())?;
+    *auth = false;
+    Ok(())
 }
 
 // =============================================================================
@@ -2006,6 +2164,9 @@ fn get_db_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 
 #[tauri::command]
 fn create_backup(app: tauri::AppHandle) -> Result<BackupInfo, String> {
+    let state = app.state::<AppState>();
+    require_auth(&state)?;
+
     let backup_dir = get_backup_dir(&app)?;
     let db_path = get_db_path(&app)?;
     let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
@@ -2017,7 +2178,6 @@ fn create_backup(app: tauri::AppHandle) -> Result<BackupInfo, String> {
     let size_bytes = metadata.len();
     let created_at = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-    // Cleanup old backups if max_count is set
     if let Ok(max_count) = get_auto_backup_max_count_internal(&app) {
         cleanup_old_backups(&app, max_count)?;
     }
@@ -2030,9 +2190,21 @@ fn create_backup(app: tauri::AppHandle) -> Result<BackupInfo, String> {
     })
 }
 
-fn get_auto_backup_max_count_internal(_app: &tauri::AppHandle) -> Result<i32, String> {
-    // This is a simplified internal function - actual impl would query settings
-    Ok(10)
+fn get_auto_backup_max_count_internal(app: &tauri::AppHandle) -> Result<i32, String> {
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let config_path = app_data_dir.join("backup_config.json");
+    if config_path.exists() {
+        let content = std::fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
+        let config: serde_json::Value =
+            serde_json::from_str(&content).map_err(|e| e.to_string())?;
+        let max_count = config
+            .get("max_count")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(10) as i32;
+        Ok(max_count)
+    } else {
+        Ok(10)
+    }
 }
 
 fn cleanup_old_backups(app: &tauri::AppHandle, max_count: i32) -> Result<(), String> {
@@ -2081,28 +2253,69 @@ fn list_backups(app: tauri::AppHandle) -> Result<Vec<BackupInfo>, String> {
     Ok(entries)
 }
 
+fn validate_backup_filename(filename: &str) -> Result<(), String> {
+    // Check for path traversal attempts
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err("非法的文件名".to_string());
+    }
+    // Must start with lcgl_backup_ and end with .db
+    if !filename.starts_with("lcgl_backup_") || !filename.ends_with(".db") {
+        return Err("非法的备份文件名".to_string());
+    }
+    // Check filename length (reasonable limit)
+    if filename.len() > 100 {
+        return Err("文件名过长".to_string());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn restore_backup(app: tauri::AppHandle, filename: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    require_auth(&state)?;
+
+    validate_backup_filename(&filename)?;
+
     let backup_dir = get_backup_dir(&app)?;
     let backup_path = backup_dir.join(&filename);
     let db_path = get_db_path(&app)?;
+
+    if !backup_path.starts_with(&backup_dir) {
+        return Err("非法的文件路径".to_string());
+    }
 
     if !backup_path.exists() {
         return Err("备份文件不存在".to_string());
     }
 
-    // Close current DB connection by dropping the state temporarily
-    // Then copy backup over and reinitialize
     std::fs::copy(&backup_path, &db_path).map_err(|e| format!("恢复失败: {}", e))?;
+
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let _ = log_audit_event(&conn, "backup_restore", &format!("恢复备份: {}", filename));
+
     Ok(())
 }
 
 #[tauri::command]
 fn delete_backup(app: tauri::AppHandle, filename: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    require_auth(&state)?;
+
+    validate_backup_filename(&filename)?;
+
     let backup_dir = get_backup_dir(&app)?;
     let backup_path = backup_dir.join(&filename);
+
+    if !backup_path.starts_with(&backup_dir) {
+        return Err("非法的文件路径".to_string());
+    }
+
     if backup_path.exists() {
         std::fs::remove_file(&backup_path).map_err(|e| format!("删除失败: {}", e))?;
+
+        let state = app.state::<AppState>();
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        let _ = log_audit_event(&conn, "backup_delete", &format!("删除备份: {}", filename));
     }
     Ok(())
 }
@@ -2135,6 +2348,9 @@ fn set_auto_backup_config(
     enabled: bool,
     max_count: i32,
 ) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    require_auth(&state)?;
+
     let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
     let config_path = app_data_dir.join("backup_config.json");
@@ -2175,6 +2391,7 @@ pub fn run() {
 
             app.manage(AppState {
                 db: Mutex::new(conn),
+                authenticated: Mutex::new(false),
             });
 
             println!("Database initialized successfully");
@@ -2188,6 +2405,7 @@ pub fn run() {
             check_password,
             set_password,
             has_password,
+            logout,
             // Backup & restore
             create_backup,
             list_backups,
