@@ -288,16 +288,15 @@ export default function Dashboard() {
     .reduce((s, a) => s + a.balance, 0);
   const netWorth = totalAssets - totalLiabilities;
 
-  const now = new Date();
-  const thisMonth = now.toISOString().slice(0, 7);
-  const monthTxs = transactions.filter((tx) => tx.transaction_date.startsWith(thisMonth));
-  const monthlyIncome = monthTxs
-    .filter((tx) => tx.transaction_type === 'income')
-    .reduce((s, tx) => s + tx.amount, 0);
-  const monthlyExpense = monthTxs
-    .filter((tx) => tx.transaction_type === 'expense')
-    .reduce((s, tx) => s + tx.amount, 0);
-  const monthlyCashFlow = monthlyIncome - monthlyExpense;
+  const liquidAssetsTotal = accounts
+    .filter((a) => a.type === 'asset')
+    .reduce((s, a) => {
+      const cat = categories.find((c) => c.id === a.category_id);
+      const parentCat = categories.find((c) => c.id === cat?.parent_id);
+      const catName = parentCat?.name ?? cat?.name ?? '';
+      if (catName === '固定资产') return s;
+      return s + a.balance;
+    }, 0);
 
   const totalPremium = insurances
     .filter((i) => i.is_active)
@@ -318,7 +317,6 @@ export default function Dashboard() {
 
   const totalMarketValue = holdings.reduce((s, h) => s + h.current_value, 0);
   const totalUnrealizedPnl = holdings.reduce((s, h) => s + h.unrealized_pnl, 0);
-  const cashFlowPositive = monthlyCashFlow >= 0;
 
   const liabilityAccounts = accounts.filter((a) => a.type === 'liability');
   const longTermLiab = liabilityAccounts.filter((a) => (a.term_months ?? 0) > 12);
@@ -770,23 +768,21 @@ export default function Dashboard() {
           </div>
           <div className="col-span-2">
             <KpiCard
+              label="流动性资产"
+              value={`¥${(liquidAssetsTotal / 10000).toFixed(0)}万`}
+              icon={<IconBuilding />}
+              gradientFrom="#0ea5e9"
+              gradientTo="#0284c7"
+            />
+          </div>
+          <div className="col-span-2">
+            <KpiCard
               label="总负债"
               value={`¥${(totalLiabilities / 10000).toFixed(0)}万`}
               icon={<IconCard />}
               gradientFrom="#f43f5e"
               gradientTo="#e11d48"
               trend={-1.2}
-            />
-          </div>
-          <div className="col-span-2">
-            <KpiCard
-              label="月现金流"
-              value={`¥${(monthlyCashFlow / 1000).toFixed(0)}k`}
-              icon={<IconTrendUp />}
-              gradientFrom={cashFlowPositive ? '#0ea5e9' : '#f97316'}
-              gradientTo={cashFlowPositive ? '#0284c7' : '#ea580c'}
-              subValue={`收入 ¥${(monthlyIncome / 1000).toFixed(0)}k / 支出 ¥${(monthlyExpense / 1000).toFixed(0)}k`}
-              subLabel="本月"
             />
           </div>
           <div className="col-span-2">

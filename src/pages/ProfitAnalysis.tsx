@@ -11,7 +11,7 @@ import {
 } from '../lib/api';
 
 type Granularity = 'day' | 'week' | 'month' | 'quarter' | 'year';
-type Tab = 'timeseries' | 'holding' | 'sip' | 'performance' | 'histogram';
+type Tab = 'timeseries' | 'holding' | 'performance';
 
 const GRANULARITY_LABELS: Record<Granularity, string> = {
   day: '日',
@@ -104,45 +104,6 @@ function aggregateHoldingsByDate(holdings: Holding[], gran: Granularity): Series
     .map(([date, value]) => ({ date, value }));
 }
 
-type SipPoint = { month: number; avgCost: number; price: number };
-
-function calcSipSmileCurve(holdings: Holding[]): SipPoint[] {
-  const sipHoldings = holdings.filter(
-    (h) => h.holding_type === 'fund' || h.holding_type === 'stock'
-  );
-  if (sipHoldings.length === 0) return [];
-  const sorted = [...sipHoldings].sort(
-    (a, b) => new Date(a.purchase_date || 0).getTime() - new Date(b.purchase_date || 0).getTime()
-  );
-
-  let totalCost = 0;
-  let totalShares = 0;
-  const points: SipPoint[] = [];
-
-  for (const h of sorted) {
-    if (!h.purchase_date) continue;
-    totalCost += h.cost_basis;
-    totalShares += h.shares;
-
-    const purchaseMonth = new Date(h.purchase_date).getTime();
-    const monthsSinceStart = Math.max(
-      1,
-      Math.round(
-        (purchaseMonth - new Date(sorted[0].purchase_date || 0).getTime()) /
-          (1000 * 60 * 60 * 24 * 30)
-      )
-    );
-
-    const avgCost = totalShares > 0 ? totalCost / totalShares : 0;
-    points.push({
-      month: monthsSinceStart,
-      avgCost,
-      price: h.current_price,
-    });
-  }
-  return points;
-}
-
 interface PerformanceRow {
   symbol: string;
   name: string;
@@ -193,35 +154,6 @@ function calcPerformanceRows(holdings: Holding[]): {
     rows,
     portfolioIRR: calcIRR(portfolioFlows) * 100,
   };
-}
-
-interface HistBin {
-  label: string;
-  wins: number;
-  losses: number;
-}
-
-function calcHistogram(holdings: Holding[]): HistBin[] {
-  const bins: HistBin[] = [
-    { label: '<-20%', wins: 0, losses: 0 },
-    { label: '-20%~0%', wins: 0, losses: 0 },
-    { label: '0%~10%', wins: 0, losses: 0 },
-    { label: '10%~30%', wins: 0, losses: 0 },
-    { label: '30%~50%', wins: 0, losses: 0 },
-    { label: '>50%', wins: 0, losses: 0 },
-  ];
-
-  for (const h of holdings) {
-    if (h.cost_basis <= 0) continue;
-    const pct = ((h.current_value - h.cost_basis) / h.cost_basis) * 100;
-    if (pct < -20) bins[0].losses++;
-    else if (pct < 0) bins[1].losses++;
-    else if (pct < 10) bins[2].wins++;
-    else if (pct < 30) bins[3].wins++;
-    else if (pct < 50) bins[4].wins++;
-    else bins[5].wins++;
-  }
-  return bins;
 }
 
 type TxMarker = {
@@ -306,13 +238,9 @@ export default function ProfitAnalysis() {
 
   const timeseriesChartRef = useRef<HTMLDivElement>(null);
   const holdingChartRef = useRef<HTMLDivElement>(null);
-  const sipChartRef = useRef<HTMLDivElement>(null);
-  const histChartRef = useRef<HTMLDivElement>(null);
 
   const timeseriesChart = useRef<echarts.ECharts | null>(null);
   const holdingChart = useRef<echarts.ECharts | null>(null);
-  const sipChart = useRef<echarts.ECharts | null>(null);
-  const histChart = useRef<echarts.ECharts | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -347,8 +275,6 @@ export default function ProfitAnalysis() {
     const resizeCharts = () => {
       timeseriesChart.current?.resize();
       holdingChart.current?.resize();
-      sipChart.current?.resize();
-      histChart.current?.resize();
     };
     window.addEventListener('resize', resizeCharts);
     return () => window.removeEventListener('resize', resizeCharts);
@@ -356,9 +282,19 @@ export default function ProfitAnalysis() {
 
   useEffect(() => {
     if (!timeseriesChartRef.current) return;
-    if (!timeseriesChart.current) {
-      timeseriesChart.current = echarts.init(timeseriesChartRef.current);
+
+    if (activeTab !== 'timeseries') {
+      if (timeseriesChart.current) {
+        timeseriesChart.current.dispose();
+        timeseriesChart.current = null;
+      }
+      return;
     }
+
+    if (timeseriesChart.current) {
+      timeseriesChart.current.dispose();
+    }
+    timeseriesChart.current = echarts.init(timeseriesChartRef.current);
     const chart = timeseriesChart.current;
 
     const series = aggregateSnapshots(snapshots, granularity);
@@ -423,14 +359,24 @@ export default function ProfitAnalysis() {
       ],
     };
 
-    chart.setOption(option as any, true);
-  }, [snapshots, holdings, granularity]);
+    chart.setOption(option as any, false);
+  }, [snapshots, holdings, granularity, activeTab]);
 
   useEffect(() => {
     if (!holdingChartRef.current) return;
-    if (!holdingChart.current) {
-      holdingChart.current = echarts.init(holdingChartRef.current);
+
+    if (activeTab !== 'holding') {
+      if (holdingChart.current) {
+        holdingChart.current.dispose();
+        holdingChart.current = null;
+      }
+      return;
     }
+
+    if (holdingChart.current) {
+      holdingChart.current.dispose();
+    }
+    holdingChart.current = echarts.init(holdingChartRef.current);
     const chart = holdingChart.current;
 
     if (!selectedHolding || holdingPrices.length === 0) {
@@ -522,144 +468,8 @@ export default function ProfitAnalysis() {
       ],
     };
 
-    chart.setOption(option as any, true);
-  }, [selectedHolding, holdingPrices]);
-
-  useEffect(() => {
-    if (!sipChartRef.current) return;
-    if (!sipChart.current) {
-      sipChart.current = echarts.init(sipChartRef.current);
-    }
-    const chart = sipChart.current;
-
-    const points = calcSipSmileCurve(holdings);
-
-    if (points.length === 0) {
-      chart.clear();
-      return;
-    }
-
-    const option = {
-      backgroundColor: CHART_BG,
-      tooltip: {
-        ...darkTooltip(),
-        formatter: (params: any) => {
-          const point = points[params.dataIndex];
-          return `第${point.month}个月<br/>平均成本: ¥${point.avgCost.toFixed(3)}<br/>当前价: ¥${point.price.toFixed(3)}`;
-        },
-      },
-      legend: {
-        data: ['平均成本', '当前价格'],
-        textStyle: { color: CHART_TEXT },
-        top: 8,
-      },
-      grid: { top: 40, right: 20, bottom: 40, left: 60, containLabel: true },
-      xAxis: {
-        type: 'value',
-        name: '月份',
-        nameTextStyle: { color: CHART_TEXT },
-        axisLabel: { color: CHART_TEXT, fontSize: 11 },
-        axisLine: { lineStyle: { color: CHART_LINE } },
-        ...darkSplitLine(),
-      },
-      yAxis: {
-        type: 'value',
-        name: '价格/成本',
-        nameTextStyle: { color: CHART_TEXT },
-        axisLabel: {
-          color: CHART_TEXT,
-          fontSize: 11,
-          formatter: (v: number) => `¥${v}`,
-        },
-        splitLine: {
-          lineStyle: { color: CHART_LINE, type: 'dashed', opacity: 0.4 },
-        },
-      },
-      series: [
-        {
-          name: '平均成本',
-          type: 'line',
-          smooth: true,
-          data: points.map((p) => [p.month, p.avgCost]),
-          lineStyle: { color: '#f59e0b', width: 2.5 },
-          itemStyle: { color: '#f59e0b' },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(245,158,11,0.15)' },
-              { offset: 1, color: 'rgba(245,158,11,0)' },
-            ]),
-          },
-        },
-        {
-          name: '当前价格',
-          type: 'line',
-          smooth: true,
-          data: points.map((p) => [p.month, p.price]),
-          lineStyle: { color: '#4f46e5', width: 2, type: 'dashed' },
-          itemStyle: { color: '#4f46e5' },
-        },
-      ],
-    };
-
-    chart.setOption(option as any, true);
-  }, [holdings]);
-
-  useEffect(() => {
-    if (!histChartRef.current) return;
-    if (!histChart.current) {
-      histChart.current = echarts.init(histChartRef.current);
-    }
-    const chart = histChart.current;
-
-    const bins = calcHistogram(holdings);
-
-    const option = {
-      backgroundColor: CHART_BG,
-      tooltip: {
-        ...darkTooltip(),
-        formatter: (params: any) => {
-          const bin = bins[params.dataIndex];
-          return `${params.name}<br/>盈利: ${bin.wins}个<br/>亏损: ${bin.losses}个`;
-        },
-      },
-      grid: { top: 20, right: 20, bottom: 40, left: 60, containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: bins.map((b) => b.label),
-        axisLabel: { color: CHART_TEXT, fontSize: 11 },
-        axisLine: { lineStyle: { color: CHART_LINE } },
-      },
-      yAxis: {
-        type: 'value',
-        name: '持仓数',
-        nameTextStyle: { color: CHART_TEXT },
-        axisLabel: { color: CHART_TEXT, fontSize: 11 },
-        splitLine: {
-          lineStyle: { color: CHART_LINE, type: 'dashed', opacity: 0.4 },
-        },
-      },
-      series: [
-        {
-          name: '盈利',
-          type: 'bar',
-          stack: 'total',
-          data: bins.map((b) => b.wins),
-          itemStyle: { color: '#10b981', borderRadius: [0, 0, 0, 0] },
-          barMaxWidth: 40,
-        },
-        {
-          name: '亏损',
-          type: 'bar',
-          stack: 'total',
-          data: bins.map((b) => -b.losses),
-          itemStyle: { color: '#f43f5e', borderRadius: [0, 0, 0, 0] },
-          barMaxWidth: 40,
-        },
-      ],
-    };
-
-    chart.setOption(option as any, true);
-  }, [holdings]);
+    chart.setOption(option as any, false);
+  }, [selectedHolding, holdingPrices, activeTab]);
 
   const timeSeriesData = useMemo(
     () => aggregateSnapshots(snapshots, granularity),
@@ -773,9 +583,7 @@ export default function ProfitAnalysis() {
             [
               ['timeseries', '📈 时间序列'],
               ['holding', '💼 持仓详情'],
-              ['sip', '😊 微笑曲线'],
               ['performance', '🏆 绩效指标'],
-              ['histogram', '📊 盈亏分布'],
             ] as [Tab, string][]
           ).map(([tab, label]) => (
             <button
@@ -995,30 +803,6 @@ export default function ProfitAnalysis() {
           </div>
         )}
 
-        {activeTab === 'sip' && (
-          <div className="space-y-4">
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-              <div ref={sipChartRef} style={{ width: '100%', height: 380 }} />
-              {calcSipSmileCurve(holdings).length === 0 && (
-                <div className="text-center text-slate-400 text-sm py-8 flex flex-col items-center gap-2">
-                  <span className="text-4xl opacity-30">😊</span>
-                  <p>暂无定投数据。请先添加股票或基金持仓。</p>
-                  <p className="text-xs text-slate-300">坚持定投，微笑曲线会告诉您时间的价值</p>
-                </div>
-              )}
-            </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-600 mb-2">😊 微笑曲线说明</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                定投的微笑曲线展示了在持续买入过程中，平均成本如何随市场价格变化而变化。
-                当市场价格低于平均成本时，同样的金额可以买入更多份额（曲线下降）；
-                当市场价格高于平均成本时，收益率提升（曲线上升）。
-                微笑曲线的两端代表成本稳定期，中间代表积累份额的最佳时机。
-              </p>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'performance' && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1126,60 +910,6 @@ export default function ProfitAnalysis() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'histogram' && (
-          <div className="space-y-4">
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-              <div ref={histChartRef} style={{ width: '100%', height: 340 }} />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {[
-                {
-                  label: '🎉 盈利持仓',
-                  value: holdings.filter((h) => h.cost_basis > 0 && h.current_value > h.cost_basis)
-                    .length,
-                  color: 'text-emerald-500',
-                  accent: true,
-                },
-                {
-                  label: '📉 亏损持仓',
-                  value: holdings.filter((h) => h.cost_basis > 0 && h.current_value < h.cost_basis)
-                    .length,
-                  color: 'text-rose-500',
-                  accent: true,
-                },
-                {
-                  label: '⚡ 胜率',
-                  value:
-                    holdings.length > 0
-                      ? `${(
-                          (holdings.filter(
-                            (h) => h.cost_basis > 0 && h.current_value > h.cost_basis
-                          ).length /
-                            Math.max(holdings.filter((h) => h.cost_basis > 0).length, 1)) *
-                          100
-                        ).toFixed(1)}%`
-                      : 'N/A',
-                  color: 'text-indigo-600',
-                  accent: true,
-                },
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  className="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm"
-                >
-                  <div className="text-xs text-slate-400 mb-1">{item.label}</div>
-                  <div
-                    className={`${item.accent ? 'text-2xl font-bold' : 'text-lg font-semibold'} ${item.color}`}
-                  >
-                    {item.value}
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         )}

@@ -5,6 +5,7 @@ import {
   deleteReminder,
   completeReminder,
   getReminders,
+  Holding,
 } from '../lib/api';
 
 export interface SipPlan {
@@ -14,7 +15,7 @@ export interface SipPlan {
   name: string;
   amount: number;
   currency: string;
-  frequency: 'weekly' | 'monthly';
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
   dayOfWeek?: number;
   dayOfMonth?: number;
   nextDueDate: string;
@@ -26,17 +27,20 @@ export interface SipPlan {
 
 const FREQUENCY_OPTIONS = [
   { value: 'weekly', label: '每周' },
+  { value: 'biweekly', label: '双周' },
   { value: 'monthly', label: '每月' },
+  { value: 'quarterly', label: '季度' },
 ];
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 interface Props {
   plans: SipPlan[];
+  holdings?: Holding[];
   onRefresh: () => void;
 }
 
-export function SipPlanPanel({ plans, onRefresh }: Props) {
+export function SipPlanPanel({ plans, holdings, onRefresh }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [editingPlan, setEditingPlan] = useState<SipPlan | null>(null);
 
@@ -45,20 +49,20 @@ export function SipPlanPanel({ plans, onRefresh }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">进行中的计划</div>
-          <div className="text-2xl font-semibold text-indigo-600">{activePlans.length}</div>
+      <div className="grid grid-cols-6 gap-2">
+        <div className="bg-white border border-slate-200 rounded-xl p-3">
+          <div className="text-xs text-slate-500 mb-0.5">进行中</div>
+          <div className="text-xl font-semibold text-indigo-600">{activePlans.length}</div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">累计投入</div>
-          <div className="text-2xl font-semibold text-amber-600">
+        <div className="bg-white border border-slate-200 rounded-xl p-3">
+          <div className="text-xs text-slate-500 mb-0.5">累计投入</div>
+          <div className="text-xl font-semibold text-amber-600">
             ¥{totalInvested.toLocaleString()}
           </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">每周定投</div>
-          <div className="text-2xl font-semibold text-indigo-600">
+        <div className="bg-white border border-slate-200 rounded-xl p-3">
+          <div className="text-xs text-slate-500 mb-0.5">每周</div>
+          <div className="text-xl font-semibold text-indigo-600">
             ¥
             {plans
               .filter((p) => p.frequency === 'weekly' && p.isActive)
@@ -66,12 +70,32 @@ export function SipPlanPanel({ plans, onRefresh }: Props) {
               .toLocaleString()}
           </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500 mb-1">每月定投</div>
-          <div className="text-2xl font-semibold text-indigo-600">
+        <div className="bg-white border border-slate-200 rounded-xl p-3">
+          <div className="text-xs text-slate-500 mb-0.5">每月</div>
+          <div className="text-xl font-semibold text-indigo-600">
             ¥
             {plans
               .filter((p) => p.frequency === 'monthly' && p.isActive)
+              .reduce((s, p) => s + p.amount, 0)
+              .toLocaleString()}
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-3">
+          <div className="text-xs text-slate-500 mb-0.5">双周</div>
+          <div className="text-xl font-semibold text-amber-600">
+            ¥
+            {plans
+              .filter((p) => p.frequency === 'biweekly' && p.isActive)
+              .reduce((s, p) => s + p.amount, 0)
+              .toLocaleString()}
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-3">
+          <div className="text-xs text-slate-500 mb-0.5">季度</div>
+          <div className="text-xl font-semibold text-rose-600">
+            ¥
+            {plans
+              .filter((p) => p.frequency === 'quarterly' && p.isActive)
               .reduce((s, p) => s + p.amount, 0)
               .toLocaleString()}
           </div>
@@ -108,6 +132,7 @@ export function SipPlanPanel({ plans, onRefresh }: Props) {
       {(showCreate || editingPlan) && (
         <SipPlanModal
           plan={editingPlan}
+          holdings={holdings}
           onClose={() => {
             setShowCreate(false);
             setEditingPlan(null);
@@ -175,9 +200,23 @@ function SipPlanCard({
             <span className="text-sm font-semibold text-slate-800">{plan.symbol}</span>
             <span className="text-xs text-slate-500">{plan.name}</span>
             <span
-              className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${plan.frequency === 'monthly' ? 'bg-indigo-100 text-indigo-600' : 'bg-indigo-100 text-indigo-600'}`}
+              className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
+                plan.frequency === 'weekly'
+                  ? 'bg-emerald-100 text-emerald-600'
+                  : plan.frequency === 'biweekly'
+                    ? 'bg-amber-100 text-amber-600'
+                    : plan.frequency === 'monthly'
+                      ? 'bg-indigo-100 text-indigo-600'
+                      : 'bg-rose-100 text-rose-600'
+              }`}
             >
-              {plan.frequency === 'monthly' ? '每月' : '每周'}
+              {plan.frequency === 'weekly'
+                ? '每周'
+                : plan.frequency === 'biweekly'
+                  ? '双周'
+                  : plan.frequency === 'monthly'
+                    ? '每月'
+                    : '季度'}
             </span>
           </div>
           <div className="text-lg font-semibold text-amber-600">
@@ -248,18 +287,19 @@ function SipPlanCard({
 
 interface SipPlanModalProps {
   plan: SipPlan | null;
+  holdings?: Holding[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function SipPlanModal({ plan, onClose, onSuccess }: SipPlanModalProps) {
+function SipPlanModal({ plan, holdings, onClose, onSuccess }: SipPlanModalProps) {
   const today = new Date().toISOString().split('T')[0];
   const [form, setForm] = useState({
     symbol: plan?.symbol ?? '',
     name: plan?.name ?? '',
     amount: plan?.amount ?? 1000,
     currency: plan?.currency ?? 'CNY',
-    frequency: plan?.frequency ?? ('monthly' as 'weekly' | 'monthly'),
+    frequency: plan?.frequency ?? ('monthly' as 'weekly' | 'biweekly' | 'monthly' | 'quarterly'),
     dayOfWeek: plan?.dayOfWeek ?? 1,
     dayOfMonth: plan?.dayOfMonth ?? 1,
     nextDueDate: plan?.nextDueDate ?? today,
@@ -333,6 +373,34 @@ function SipPlanModal({ plan, onClose, onSuccess }: SipPlanModalProps) {
           {plan ? '编辑定投计划' : '创建定投计划'}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {holdings && holdings.length > 0 && (
+            <div>
+              <label
+                htmlFor="sip-holding-select"
+                className="block text-xs font-medium text-slate-500 mb-1.5"
+              >
+                选择已有持仓（选填）
+              </label>
+              <select
+                id="sip-holding-select"
+                value=""
+                onChange={(e) => {
+                  const h = holdings.find((h) => h.id === parseInt(e.target.value));
+                  if (h) {
+                    setForm((f) => ({ ...f, symbol: h.symbol, name: h.name }));
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+              >
+                <option value="">-- 选择持仓 --</option>
+                {holdings.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.symbol} - {h.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label
@@ -405,13 +473,16 @@ function SipPlanModal({ plan, onClose, onSuccess }: SipPlanModalProps) {
 
           <div>
             <span className="block text-xs font-medium text-slate-500 mb-2">频率</span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {FREQUENCY_OPTIONS.map((f) => (
                 <button
                   key={f.value}
                   type="button"
                   onClick={() =>
-                    setForm((fo) => ({ ...fo, frequency: f.value as 'weekly' | 'monthly' }))
+                    setForm((fo) => ({
+                      ...fo,
+                      frequency: f.value as 'weekly' | 'biweekly' | 'monthly' | 'quarterly',
+                    }))
                   }
                   className={`py-2 rounded-lg text-sm font-medium border transition-all duration-200 ${
                     form.frequency === f.value
@@ -425,7 +496,7 @@ function SipPlanModal({ plan, onClose, onSuccess }: SipPlanModalProps) {
             </div>
           </div>
 
-          {form.frequency === 'weekly' ? (
+          {form.frequency === 'weekly' || form.frequency === 'biweekly' ? (
             <div>
               <span className="block text-xs font-medium text-slate-500 mb-2">选择星期</span>
               <div className="grid grid-cols-7 gap-1">
@@ -448,7 +519,7 @@ function SipPlanModal({ plan, onClose, onSuccess }: SipPlanModalProps) {
           ) : (
             <div>
               <label htmlFor="sip-day" className="block text-xs font-medium text-slate-500 mb-1.5">
-                每月几号 (1-31)
+                每月/每季几号 (1-31)
               </label>
               <input
                 id="sip-day"
@@ -493,22 +564,37 @@ function SipPlanModal({ plan, onClose, onSuccess }: SipPlanModalProps) {
 }
 
 function calculateNextDue(
-  frequency: 'weekly' | 'monthly',
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'quarterly',
   dayOfWeek: number,
   dayOfMonth: number
 ): string {
   const now = new Date();
-  if (frequency === 'weekly') {
-    const daysUntil = (dayOfWeek - now.getDay() + 7) % 7 || 7;
-    now.setDate(now.getDate() + daysUntil);
-  } else {
-    now.setDate(Math.min(dayOfMonth, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()));
-    if (now < new Date()) {
-      now.setMonth(now.getMonth() + 1);
+  switch (frequency) {
+    case 'weekly':
+      const daysUntil = (dayOfWeek - now.getDay() + 7) % 7 || 7;
+      now.setDate(now.getDate() + daysUntil);
+      break;
+    case 'biweekly':
+      const daysUntilB = (dayOfWeek - now.getDay() + 7) % 7 || 7;
+      now.setDate(now.getDate() + daysUntilB + 14);
+      break;
+    case 'monthly':
       now.setDate(
         Math.min(dayOfMonth, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate())
       );
-    }
+      if (now < new Date()) {
+        now.setMonth(now.getMonth() + 1);
+        now.setDate(
+          Math.min(dayOfMonth, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate())
+        );
+      }
+      break;
+    case 'quarterly':
+      now.setMonth(now.getMonth() + 3);
+      now.setDate(
+        Math.min(dayOfMonth, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate())
+      );
+      break;
   }
   return now.toISOString().split('T')[0];
 }

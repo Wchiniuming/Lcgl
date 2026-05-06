@@ -78,6 +78,25 @@ function IconTrash() {
   );
 }
 
+function IconCopy() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
 function IconArrowLeft() {
   return (
     <svg
@@ -230,11 +249,16 @@ export default function Accounts() {
     }
   }
 
-  const filteredAccounts = accounts.filter((a) => {
-    if (typeFilter !== 'all' && a.type !== typeFilter) return false;
-    if (categoryFilter !== 'all' && a.category_id !== parseInt(categoryFilter)) return false;
-    return true;
-  });
+  const filteredAccounts = accounts
+    .filter((a) => {
+      if (typeFilter !== 'all' && a.type !== typeFilter) return false;
+      if (categoryFilter !== 'all' && a.category_id !== parseInt(categoryFilter)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'asset' ? -1 : 1;
+      return b.balance - a.balance;
+    });
 
   const totalAssets = accounts
     .filter((a) => a.type === 'asset')
@@ -261,6 +285,28 @@ export default function Accounts() {
       maturity_date: '',
       payment_due_day: '',
       notes: '',
+    });
+    setFormErrors({});
+    setView('form');
+  }
+
+  function handleCopyAccount(account: Account) {
+    setSelectedAccount(null);
+    setEditMode(true);
+    setFormData({
+      name: account.name + ' (副本)',
+      category_id: String(account.category_id),
+      type: account.type,
+      balance: String(account.balance),
+      currency: account.currency,
+      institution: account.institution ?? '',
+      account_no: account.account_no ?? '',
+      interest_rate: account.interest_rate != null ? String(account.interest_rate) : '',
+      term_months: account.term_months != null ? String(account.term_months) : '',
+      start_date: account.start_date ?? '',
+      maturity_date: account.maturity_date ?? '',
+      payment_due_day: account.payment_due_day != null ? String(account.payment_due_day) : '',
+      notes: account.notes ?? '',
     });
     setFormErrors({});
     setView('form');
@@ -684,6 +730,17 @@ export default function Accounts() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                handleCopyAccount(account);
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="复制"
+                            >
+                              <IconCopy />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 openEditForm(account);
                               }}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
@@ -1079,7 +1136,6 @@ export default function Accounts() {
                         onClick={() => {
                           if (selectedAccount) {
                             setEditMode(false);
-                            openEditForm(selectedAccount);
                           } else {
                             setView('list');
                           }

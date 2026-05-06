@@ -17,6 +17,8 @@ export type InvestmentTransactionType =
   | 'reduce_position'
   | 'sip';
 
+export type SipFrequency = 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
+
 export interface TransactionFormData {
   holdingId: number | null;
   symbol: string;
@@ -28,6 +30,12 @@ export interface TransactionFormData {
   shares: number;
   fees: number;
   currency: string;
+  // SIP fields
+  sipAmount?: number;
+  sipFrequency?: SipFrequency;
+  // Existing holdings baseline (for new mode)
+  existingCostBasis?: number;
+  existingRealizedPnl?: number;
 }
 
 const HOLDING_TYPES: { value: HoldingType; label: string }[] = [
@@ -48,29 +56,149 @@ const TX_TYPES: { value: InvestmentTransactionType; label: string; color: string
   { value: 'sip', label: '定投', color: 'text-violet-400' },
 ];
 
+const SIP_FREQUENCIES: { value: SipFrequency; label: string }[] = [
+  { value: 'weekly', label: '每周' },
+  { value: 'biweekly', label: '双周' },
+  { value: 'monthly', label: '每月' },
+  { value: 'quarterly', label: '每季' },
+];
+
+function ExistingHoldingsSection({
+  form,
+  setForm,
+}: {
+  form: TransactionFormData;
+  setForm: React.Dispatch<React.SetStateAction<TransactionFormData>>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasExisting = form.existingCostBasis !== undefined && form.existingCostBasis > 0;
+
+  return (
+    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          <span className="text-xs font-medium text-amber-700">已有持仓信息（选填）</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasExisting && (
+            <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded">已填</span>
+          )}
+          <svg
+            className={`w-4 h-4 text-amber-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+      {expanded && (
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="existing-cost-input"
+              className="block text-xs font-medium text-amber-600 mb-1"
+            >
+              已有成本 {form.currency}
+            </label>
+            <input
+              id="existing-cost-input"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.existingCostBasis ?? ''}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  existingCostBasis: parseFloat(e.target.value) || undefined,
+                }))
+              }
+              placeholder="已投入总成本"
+              className="w-full bg-white border border-amber-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-colors"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="existing-pnl-input"
+              className="block text-xs font-medium text-amber-600 mb-1"
+            >
+              已有收益 {form.currency}
+            </label>
+            <input
+              id="existing-pnl-input"
+              type="number"
+              step="0.01"
+              value={form.existingRealizedPnl ?? ''}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  existingRealizedPnl:
+                    e.target.value === '' ? undefined : parseFloat(e.target.value) || 0,
+                }))
+              }
+              placeholder="已实现盈亏（含正负）"
+              className="w-full bg-white border border-amber-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-colors"
+            />
+          </div>
+          <div className="col-span-2">
+            <p className="text-xs text-amber-600/80">
+              用于记录此前已持有的仓位成本，系统会自动将其纳入成本计算
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   holding?: Holding | null;
+  copyFrom?: Holding | null;
+  editingTransaction?: {
+    holding: Holding;
+    transactionIndex: number;
+    transaction: any;
+  };
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
+export function HoldingForm({ holding, copyFrom, editingTransaction, onSuccess, onCancel }: Props) {
   const today = new Date().toISOString().split('T')[0];
   const [form, setForm] = useState<TransactionFormData>({
-    holdingId: holding?.id ?? null,
-    symbol: holding?.symbol ?? '',
-    name: holding?.name ?? '',
-    holdingType: holding?.holding_type ?? 'stock',
-    transactionType: 'buy',
-    transactionDate: today,
-    price: holding?.current_price ?? 0,
-    shares: 0,
-    fees: 0,
-    currency: holding?.currency ?? 'CNY',
+    holdingId: copyFrom?.id ?? editingTransaction?.holding.id ?? holding?.id ?? null,
+    symbol: copyFrom?.symbol ?? editingTransaction?.holding.symbol ?? holding?.symbol ?? '',
+    name: copyFrom?.name ?? editingTransaction?.holding.name ?? holding?.name ?? '',
+    holdingType:
+      copyFrom?.holding_type ??
+      editingTransaction?.holding.holding_type ??
+      holding?.holding_type ??
+      'stock',
+    transactionType: editingTransaction?.transaction.type || 'buy',
+    transactionDate: editingTransaction?.transaction.date || today,
+    price:
+      editingTransaction?.transaction.price ??
+      copyFrom?.current_price ??
+      holding?.current_price ??
+      0,
+    shares: editingTransaction?.transaction.shares ?? 0,
+    fees: editingTransaction?.transaction.fees ?? 0,
+    currency:
+      copyFrom?.currency ?? editingTransaction?.holding.currency ?? holding?.currency ?? 'CNY',
+    sipAmount: editingTransaction?.transaction.sipAmount,
+    sipFrequency: editingTransaction?.transaction.sipFrequency,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'new' | 'existing'>(holding ? 'existing' : 'new');
+  const [mode, setMode] = useState<'new' | 'existing'>(
+    holding || editingTransaction ? 'existing' : 'new'
+  );
 
   const estimatedCost = form.shares * form.price + form.fees;
 
@@ -85,18 +213,19 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
           setError('请填写代码和名称');
           return;
         }
+        const totalCostBasis = estimatedCost + (form.existingCostBasis ?? 0);
         await createHolding({
           symbol: form.symbol.toUpperCase(),
           name: form.name,
           holding_type: form.holdingType,
           account_id: null,
           shares: form.shares,
-          cost_basis: estimatedCost,
-          avg_cost: form.shares > 0 ? estimatedCost / form.shares : 0,
+          cost_basis: totalCostBasis,
+          avg_cost: form.shares > 0 ? totalCostBasis / form.shares : 0,
           current_price: form.price,
           current_value: form.shares * form.price,
           unrealized_pnl: 0,
-          realized_pnl: 0,
+          realized_pnl: form.existingRealizedPnl ?? 0,
           currency: form.currency,
           risk_level: null,
           purchase_date: form.transactionDate,
@@ -109,6 +238,10 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
                 price: form.price,
                 shares: form.shares,
                 fees: form.fees,
+                ...(form.transactionType === 'sip' && {
+                  sipAmount: form.sipAmount,
+                  sipFrequency: form.sipFrequency,
+                }),
               },
             ],
           }),
@@ -123,6 +256,133 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
           volume: null,
           source: 'manual',
         });
+      } else if (editingTransaction) {
+        const parsed = JSON.parse(editingTransaction.holding.notes || '[]');
+        const txs = Array.isArray(parsed) ? parsed : parsed.transactions || [];
+        const tx = editingTransaction.transaction;
+
+        if (
+          form.transactionType === 'buy' ||
+          form.transactionType === 'add_position' ||
+          form.transactionType === 'sip'
+        ) {
+          const addedCost = form.shares * form.price + form.fees;
+          const oldCost = (tx.shares || 0) * (tx.price || 0) + (tx.fees || 0);
+          const costDelta = addedCost - oldCost;
+          const sharesDelta = form.shares - (tx.shares || 0);
+
+          let newShares = editingTransaction.holding.shares + sharesDelta;
+          let newCostBasis = editingTransaction.holding.cost_basis + costDelta;
+          let newAvgCost = newShares > 0 ? newCostBasis / newShares : 0;
+
+          txs[editingTransaction.transactionIndex] = {
+            type: form.transactionType,
+            date: form.transactionDate,
+            price: form.price,
+            shares: form.shares,
+            fees: form.fees,
+            ...(form.transactionType === 'sip' && {
+              sipAmount: form.sipAmount,
+              sipFrequency: form.sipFrequency,
+            }),
+          };
+
+          const newCurrentValue = newShares * form.price;
+          const newUnrealizedPnl = newCurrentValue - newCostBasis;
+
+          await updateHolding({
+            ...editingTransaction.holding,
+            shares: newShares,
+            cost_basis: newCostBasis,
+            avg_cost: newAvgCost,
+            current_price: form.price,
+            current_value: newCurrentValue,
+            unrealized_pnl: newUnrealizedPnl,
+            last_price_update: form.transactionDate,
+            notes: Array.isArray(parsed)
+              ? JSON.stringify(txs)
+              : JSON.stringify({ transactions: txs }),
+          });
+        } else if (form.transactionType === 'sell' || form.transactionType === 'reduce_position') {
+          const sharesDelta = form.shares - (tx.shares || 0);
+          let newShares = editingTransaction.holding.shares + sharesDelta;
+          let newCostBasis = newShares > 0 ? newShares * editingTransaction.holding.avg_cost : 0;
+
+          txs[editingTransaction.transactionIndex] = {
+            type: form.transactionType,
+            date: form.transactionDate,
+            price: form.price,
+            shares: form.shares,
+            fees: form.fees,
+          };
+
+          const newCurrentValue = newShares * form.price;
+          const newUnrealizedPnl = newCurrentValue - newCostBasis;
+
+          await updateHolding({
+            ...editingTransaction.holding,
+            shares: newShares,
+            cost_basis: newCostBasis,
+            current_price: form.price,
+            current_value: newCurrentValue,
+            unrealized_pnl: newUnrealizedPnl,
+            last_price_update: form.transactionDate,
+            notes: Array.isArray(parsed)
+              ? JSON.stringify(txs)
+              : JSON.stringify({ transactions: txs }),
+          });
+        } else if (form.transactionType === 'dividend') {
+          const oldDivAmount = (tx.shares || 0) * (tx.price || 0);
+          const newDivAmount = form.shares * form.price;
+          const divDelta = newDivAmount - oldDivAmount;
+
+          let newCostBasis = editingTransaction.holding.cost_basis - divDelta;
+          newCostBasis = Math.max(0, newCostBasis);
+          let newAvgCost =
+            editingTransaction.holding.shares > 0
+              ? newCostBasis / editingTransaction.holding.shares
+              : 0;
+
+          txs[editingTransaction.transactionIndex] = {
+            type: form.transactionType,
+            date: form.transactionDate,
+            price: form.price,
+            shares: form.shares,
+            fees: form.fees,
+          };
+
+          const newCurrentValue = editingTransaction.holding.shares * form.price;
+          const newUnrealizedPnl = newCurrentValue - newCostBasis;
+
+          await updateHolding({
+            ...editingTransaction.holding,
+            cost_basis: newCostBasis,
+            avg_cost: newAvgCost,
+            current_price: form.price,
+            current_value: newCurrentValue,
+            unrealized_pnl: newUnrealizedPnl,
+            last_price_update: form.transactionDate,
+            notes: Array.isArray(parsed)
+              ? JSON.stringify(txs)
+              : JSON.stringify({ transactions: txs }),
+          });
+        } else {
+          txs[editingTransaction.transactionIndex] = {
+            type: form.transactionType,
+            date: form.transactionDate,
+            price: form.price,
+            shares: form.shares,
+            fees: form.fees,
+          };
+          await updateHolding({
+            ...editingTransaction.holding,
+            notes: Array.isArray(parsed)
+              ? JSON.stringify(txs)
+              : JSON.stringify({ transactions: txs }),
+          });
+        }
+        onSuccess?.();
+        return;
       } else if (form.holdingId) {
         const { getHolding } = await import('../lib/api');
         const h = await getHolding(form.holdingId);
@@ -151,7 +411,11 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
 
         const newCurrentValue = newShares * form.price;
         const newUnrealizedPnl = newCurrentValue - newCostBasis;
-        const txNote = `[${form.transactionDate}] ${form.transactionType}: ${form.shares}股 @ ${form.price}`;
+        const sipSuffix =
+          form.transactionType === 'sip' && form.sipAmount
+            ? ` [定投${form.currency === 'CNY' ? '¥' : form.currency === 'USD' ? '$' : 'HK$'}${form.sipAmount}/${form.sipFrequency === 'weekly' ? '周' : form.sipFrequency === 'biweekly' ? '双周' : form.sipFrequency === 'monthly' ? '月' : '季'}]`
+            : '';
+        const txNote = `[${form.transactionDate}] ${form.transactionType}: ${form.shares}股 @ ${form.price}${sipSuffix}`;
 
         await updateHolding({
           ...h,
@@ -209,7 +473,7 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
               value={form.symbol}
               onChange={(e) => setForm((f) => ({ ...f, symbol: e.target.value.toUpperCase() }))}
               placeholder="如 AAPL"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
             />
           </div>
           <div>
@@ -223,7 +487,7 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="如 苹果公司"
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
             />
           </div>
           <div>
@@ -239,7 +503,7 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
               onChange={(e) =>
                 setForm((f) => ({ ...f, holdingType: e.target.value as HoldingType }))
               }
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
             >
               {HOLDING_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -259,7 +523,7 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
               id="currency-select"
               value={form.currency}
               onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
             >
               <option value="CNY">CNY 人民币</option>
               <option value="USD">USD 美元</option>
@@ -309,7 +573,7 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
               key={t.value}
               type="button"
               onClick={() => setForm((f) => ({ ...f, transactionType: t.value }))}
-              className={`py-2 rounded-lg text-sm font-medium border transition-all duration-200 ${
+              className={`py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${
                 form.transactionType === t.value
                   ? `${t.color} border-current bg-slate-200/80`
                   : 'text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
@@ -334,41 +598,41 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
             type="date"
             value={form.transactionDate}
             onChange={(e) => setForm((f) => ({ ...f, transactionDate: e.target.value }))}
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
           />
         </div>
         <div>
-          <label htmlFor="price-input" className="block text-xs font-medium text-slate-500 mb-1.5">
+          <label htmlFor="price-input" className="block text-xs font-medium text-slate-500 mb-1">
             单价 {form.currency}
           </label>
           <input
             id="price-input"
             type="number"
-            step="0.001"
+            step="0.00001"
             min="0"
             value={form.price || ''}
             onChange={(e) => setForm((f) => ({ ...f, price: parseFloat(e.target.value) || 0 }))}
             placeholder="0.00"
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
           />
         </div>
         <div>
-          <label htmlFor="shares-input" className="block text-xs font-medium text-slate-500 mb-1.5">
+          <label htmlFor="shares-input" className="block text-xs font-medium text-slate-500 mb-1">
             数量
           </label>
           <input
             id="shares-input"
             type="number"
-            step="0.0001"
+            step="0.00001"
             min="0"
             value={form.shares || ''}
             onChange={(e) => setForm((f) => ({ ...f, shares: parseFloat(e.target.value) || 0 }))}
             placeholder="0"
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
           />
         </div>
         <div>
-          <label htmlFor="fees-input" className="block text-xs font-medium text-slate-500 mb-1.5">
+          <label htmlFor="fees-input" className="block text-xs font-medium text-slate-500 mb-1">
             手续费 {form.currency}
           </label>
           <input
@@ -379,14 +643,14 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
             value={form.fees || ''}
             onChange={(e) => setForm((f) => ({ ...f, fees: parseFloat(e.target.value) || 0 }))}
             placeholder="0.00"
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
           />
         </div>
       </div>
 
-      <div className="rounded-lg bg-slate-50 border border-slate-200 p-4">
-        <div className="text-xs text-slate-500 mb-2">预估成本</div>
-        <div className="text-2xl font-light text-slate-800">
+      <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+        <div className="text-xs text-slate-500 mb-1">预估成本</div>
+        <div className="text-xl font-light text-slate-800">
           {form.currency === 'CNY' ? '¥' : form.currency === 'USD' ? '$' : 'HK$'}
           {estimatedCost.toLocaleString('en-US', {
             minimumFractionDigits: 2,
@@ -394,34 +658,89 @@ export function HoldingForm({ holding, onSuccess, onCancel }: Props) {
           })}
         </div>
         {form.shares > 0 && (
-          <div className="text-xs text-slate-500 mt-1">
+          <div className="text-xs text-slate-500 mt-0.5">
             {form.shares} 股 @{' '}
             {form.currency === 'CNY' ? '¥' : form.currency === 'USD' ? '$' : 'HK$'}
-            {form.price.toFixed(3)} +{' '}
+            {form.price.toFixed(5)} +{' '}
             {form.currency === 'CNY' ? '¥' : form.currency === 'USD' ? '$' : 'HK$'}
-            {form.fees.toFixed(2)} 手续费
+            {form.fees.toFixed(2)}
           </div>
         )}
       </div>
 
+      {form.transactionType === 'sip' && (
+        <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+            <span className="text-xs font-medium text-violet-700">定投设置</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="sip-amount-input"
+                className="block text-xs font-medium text-violet-600 mb-1.5"
+              >
+                定投金额 {form.currency}
+              </label>
+              <input
+                id="sip-amount-input"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.sipAmount ?? ''}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, sipAmount: parseFloat(e.target.value) || 0 }))
+                }
+                placeholder="每次定投金额"
+                className="w-full bg-white border border-violet-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/30 transition-colors"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="sip-frequency-select"
+                className="block text-xs font-medium text-violet-600 mb-1"
+              >
+                定投频次
+              </label>
+              <select
+                id="sip-frequency-select"
+                value={form.sipFrequency ?? 'monthly'}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, sipFrequency: e.target.value as SipFrequency }))
+                }
+                className="w-full bg-white border border-violet-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400/30 transition-colors"
+              >
+                {SIP_FREQUENCIES.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode === 'new' && <ExistingHoldingsSection form={form} setForm={setForm} />}
+
       {error && (
-        <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-4 py-2.5">
+        <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
           {error}
         </div>
       )}
 
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-2 pt-1">
         <button
           type="submit"
           disabled={submitting}
-          className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:bg-amber-600 disabled:cursor-not-allowed text-slate-900 font-semibold py-2.5 rounded-lg transition-all duration-200 text-sm tracking-wide"
+          className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:bg-amber-600 disabled:cursor-not-allowed text-slate-900 font-semibold py-2 rounded-lg transition-all duration-200 text-xs tracking-wide"
         >
           {submitting ? '提交中...' : '确认交易'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2.5 rounded-lg transition-all duration-200 text-sm"
+          className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 rounded-lg transition-all duration-200 text-xs"
         >
           取消
         </button>
@@ -448,7 +767,7 @@ function HoldingSelect({
       id="holding-select-existing"
       value={value ?? ''}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
+      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/30 transition-colors"
     >
       <option value="">选择持仓...</option>
       {holdings.map((h) => (
@@ -540,13 +859,13 @@ export function BatchPriceUpdate({ holdings, onSuccess, onCancel }: BatchPriceUp
               <div className="text-xs text-slate-500 truncate">{h.name}</div>
             </div>
             <div className="text-xs text-slate-500">
-              现价: <span className="text-slate-700">¥{h.current_price.toFixed(3)}</span>
+              现价: <span className="text-slate-700">¥{h.current_price.toFixed(5)}</span>
             </div>
             <div className="flex items-center gap-1">
               <input
                 id={`price-${h.id}`}
                 type="number"
-                step="0.001"
+                step="0.00001"
                 min="0"
                 value={prices.get(h.symbol) ?? ''}
                 onChange={(e) => handlePriceChange(h.symbol, e.target.value)}

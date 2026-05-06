@@ -404,13 +404,15 @@ export default function Reminders() {
                 </div>
                 <div className="divide-y divide-slate-100">
                   {typeReminders.map((reminder) => (
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       key={reminder.id}
                       className={`w-full text-left p-4 hover:bg-slate-50 cursor-pointer transition-colors ${
                         isOverdue(reminder.target_date) ? 'bg-red-50' : ''
                       }`}
                       onClick={() => handleReminderClick(reminder)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleReminderClick(reminder)}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -462,7 +464,7 @@ export default function Reminders() {
                           </button>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>

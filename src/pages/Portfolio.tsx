@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Holding, HoldingType, getHoldings, archiveHolding, getReminders } from '../lib/api';
+import { ask } from '@tauri-apps/plugin-dialog';
+import {
+  Holding,
+  HoldingType,
+  getHoldings,
+  archiveHolding,
+  getReminders,
+  updateHolding,
+} from '../lib/api';
 import { HoldingForm, BatchPriceUpdate } from '../components/HoldingForm';
 import { SipPlanPanel, SipPlan } from '../components/SipPlan';
 
@@ -54,7 +62,13 @@ export default function Portfolio() {
   const [showForm, setShowForm] = useState(false);
   const [showBatchPrice, setShowBatchPrice] = useState(false);
   const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
+  const [copyingHolding, setCopyingHolding] = useState<Holding | null>(null);
   const [showArchiveHistory, setShowArchiveHistory] = useState<Holding | null>(null);
+  const [editingTx, setEditingTx] = useState<{
+    holding: Holding;
+    transactionIndex: number;
+    transaction: any;
+  } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -172,6 +186,47 @@ export default function Portfolio() {
     } catch (err) {
       setError(String(err));
     }
+  }
+
+  function handleCopyHolding(h: Holding) {
+    setEditingHolding(null);
+    setCopyingHolding(h);
+    setShowForm(true);
+  }
+
+  async function handleDeleteTransaction(holding: Holding, txIndex: number) {
+    const confirmed = await ask('确定要删除这条交易记录吗？', {
+      title: '确认删除',
+      kind: 'warning',
+    });
+    if (!confirmed) return;
+
+    try {
+      const parsed = JSON.parse(holding.notes || '[]');
+      const txs = Array.isArray(parsed) ? parsed : parsed.transactions || [];
+      txs.splice(txIndex, 1);
+      // Handle edge case: empty array
+      let newNotes = '';
+      if (txs.length > 0) {
+        // Preserve original format: if original was a plain array, keep as array
+        if (Array.isArray(parsed)) {
+          newNotes = JSON.stringify(txs);
+        } else {
+          newNotes = JSON.stringify({ transactions: txs });
+        }
+      }
+      await updateHolding({ ...holding, notes: newNotes || null });
+      loadData();
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
+  function handleEditTransaction(holding: Holding, txIndex: number, tx: any) {
+    setEditingHolding(null);
+    setCopyingHolding(null);
+    setEditingTx({ holding, transactionIndex: txIndex, transaction: tx });
+    setShowForm(true);
   }
 
   if (loading && holdings.length === 0) {
@@ -483,6 +538,14 @@ export default function Portfolio() {
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 type="button"
+                                onClick={() => handleCopyHolding(h)}
+                                className="text-xs text-slate-400 hover:text-emerald-600 px-2 py-1 rounded hover:bg-emerald-50 transition-colors"
+                                title="复制"
+                              >
+                                复制
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => {
                                   setEditingHolding(h);
                                   setShowForm(true);
@@ -532,7 +595,8 @@ export default function Portfolio() {
                   .map((h) => {
                     let transactions: any[] = [];
                     try {
-                      transactions = JSON.parse(h.notes as string);
+                      const parsed = JSON.parse(h.notes as string);
+                      transactions = Array.isArray(parsed) ? parsed : parsed.transactions || [];
                     } catch {}
                     return transactions.map((tx, idx) => (
                       <div
@@ -547,21 +611,56 @@ export default function Portfolio() {
                                   ? 'bg-emerald-100 text-emerald-700'
                                   : tx.type === 'sell'
                                     ? 'bg-red-100 text-red-700'
-                                    : 'bg-amber-100 text-amber-700'
+                                    : tx.type === 'sip'
+                                      ? 'bg-violet-100 text-violet-700'
+                                      : 'bg-amber-100 text-amber-700'
                               }`}
                             >
-                              {tx.type === 'buy' ? '买入' : tx.type === 'sell' ? '卖出' : '分红'}
+                              {tx.type === 'buy'
+                                ? '买入'
+                                : tx.type === 'sell'
+                                  ? '卖出'
+                                  : tx.type === 'sip'
+                                    ? '定投'
+                                    : '分红'}
                             </span>
                             <span className="font-medium text-slate-800">{h.symbol}</span>
                             {h.name && <span className="text-sm text-slate-500">- {h.name}</span>}
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium text-slate-700">
-                              {tx.amount != null &&
-                                `¥${Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                              {tx.shares != null && ` × ${tx.shares}`}
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <div className="text-sm font-medium text-slate-700">
+                                {tx.type === 'sip' && tx.sipAmount != null
+                                  ? `¥${Number(tx.sipAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : tx.amount != null
+                                    ? `¥${Number(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : null}
+                                {tx.type === 'sip' && tx.sipFrequency
+                                  ? `/${tx.sipFrequency === 'weekly' ? '周' : tx.sipFrequency === 'biweekly' ? '双周' : tx.sipFrequency === 'monthly' ? '月' : '季'}`
+                                  : tx.shares != null
+                                    ? ` × ${tx.shares}`
+                                    : null}
+                              </div>
+                              <div className="text-xs text-slate-400">{tx.date}</div>
                             </div>
-                            <div className="text-xs text-slate-400">{tx.date}</div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleEditTransaction(h, idx, tx)}
+                                className="text-xs text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50 transition-colors"
+                                title="编辑"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTransaction(h, idx)}
+                                className="text-xs text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
+                                title="删除"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -573,7 +672,9 @@ export default function Portfolio() {
         )}
 
         {/* SIP tab */}
-        {activeTab === 'sip' && <SipPlanPanel plans={sipPlans} onRefresh={loadData} />}
+        {activeTab === 'sip' && (
+          <SipPlanPanel plans={sipPlans} holdings={holdings} onRefresh={loadData} />
+        )}
 
         {/* Archived tab */}
         {activeTab === 'archived' && (
@@ -608,13 +709,21 @@ export default function Portfolio() {
           <div className="bg-white border border-slate-200 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                {editingHolding ? `💹 交易 - ${editingHolding.symbol}` : '📝 新建交易'}
+                {editingTx
+                  ? `✏️ 编辑交易 - ${editingTx.holding.symbol}`
+                  : copyingHolding
+                    ? `📋 复制 - ${copyingHolding.symbol}`
+                    : editingHolding
+                      ? `💹 交易 - ${editingHolding.symbol}`
+                      : '📝 新建交易'}
               </h2>
               <button
                 type="button"
                 onClick={() => {
                   setShowForm(false);
                   setEditingHolding(null);
+                  setCopyingHolding(null);
+                  setEditingTx(null);
                 }}
                 className="text-slate-400 hover:text-slate-600 text-xl leading-none"
               >
@@ -622,15 +731,21 @@ export default function Portfolio() {
               </button>
             </div>
             <HoldingForm
-              holding={editingHolding}
+              holding={editingTx?.holding ?? editingHolding}
+              copyFrom={copyingHolding}
+              editingTransaction={editingTx ?? undefined}
               onSuccess={() => {
                 setShowForm(false);
                 setEditingHolding(null);
+                setCopyingHolding(null);
+                setEditingTx(null);
                 loadData();
               }}
               onCancel={() => {
                 setShowForm(false);
                 setEditingHolding(null);
+                setCopyingHolding(null);
+                setEditingTx(null);
               }}
             />
           </div>

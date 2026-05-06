@@ -96,11 +96,10 @@ function generateTrendData(snapshots: import('../lib/api').Snapshot[], range: Da
     dates.push(key);
     if (daysMap[key] !== undefined) {
       portfolio.push(daysMap[key]);
+    } else if (portfolio.length > 0) {
+      portfolio.push(portfolio[portfolio.length - 1]);
     } else {
-      // Synthetic: gentle random walk from base
-      const base = daysMap[Object.keys(daysMap)[0]] || 100000;
-      const noise = (Math.sin(i * 0.3) * 0.02 + (Math.random() - 0.48) * 0.01) * base;
-      portfolio.push(Math.max(0, base + noise * (1 - i / days)));
+      portfolio.push(0);
     }
   }
 
@@ -364,7 +363,7 @@ export default function InvestmentDashboard() {
           axisLabel: {
             color: '#64748b',
             fontSize: 10,
-            formatter: (v: number) => (v >= 10000 ? `${(v / 10000).toFixed(0)}w` : v.toFixed(0)),
+            formatter: (v: number) => (v >= 10000 ? `${(v / 10000).toFixed(0)}w` : v.toFixed(2)),
           },
           splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } },
         },

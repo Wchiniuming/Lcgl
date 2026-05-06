@@ -86,7 +86,7 @@ export default function QuickEntryModal({ isOpen, onClose, onSuccess }: QuickEnt
         name: form.name.trim(),
         category_id: parseInt(form.categoryId),
         type: category.type,
-        balance: parseFloat(form.amount),
+        balance: 0, // Start at 0; the adjustment transaction below will set the initial balance
         currency: 'CNY',
         institution: null,
         account_no: null,

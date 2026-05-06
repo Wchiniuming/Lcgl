@@ -92,9 +92,11 @@ export default function InsurancePage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
   const [formData, setFormData] = useState<InsuranceFormData>(initialFormData);
   const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState<string>('');
+  const [filterInsured, setFilterInsured] = useState<string>('');
 
   const stats = useMemo(() => {
     const active = insurances.filter((i) => i.status === 'active');
@@ -119,10 +121,29 @@ export default function InsurancePage() {
     };
   }, [insurances]);
 
+  const INSURANCE_TYPE_ORDER: Record<InsuranceType, number> = {
+    life: 1,
+    health: 2,
+    accident: 3,
+    critical: 4,
+    car: 5,
+    annuity: 6,
+    other: 7,
+  };
+
   const filteredInsurances = useMemo(() => {
-    if (!filterType) return insurances;
-    return insurances.filter((i) => i.insurance_type === filterType);
-  }, [insurances, filterType]);
+    return insurances
+      .filter((i) => {
+        if (filterType && i.insurance_type !== filterType) return false;
+        if (filterInsured && !i.insured_name?.includes(filterInsured)) return false;
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          (INSURANCE_TYPE_ORDER[a.insurance_type] ?? 99) -
+          (INSURANCE_TYPE_ORDER[b.insurance_type] ?? 99)
+      );
+  }, [insurances, filterType, filterInsured]);
 
   const loadData = async () => {
     try {
@@ -142,14 +163,15 @@ export default function InsurancePage() {
     loadData();
   }, []);
 
-  const handleOpenForm = (insurance?: Insurance) => {
+  const handleOpenForm = (insurance?: Insurance, copy: boolean = false) => {
     if (insurance) {
-      setEditingId(insurance.id);
+      setEditingId(copy ? null : insurance.id);
+      setIsCopying(copy);
       setFormData({
-        name: insurance.name,
+        name: copy ? insurance.name + ' (副本)' : insurance.name,
         insurance_type: insurance.insurance_type,
         provider: insurance.provider || '',
-        policy_no: insurance.policy_no || '',
+        policy_no: '',
         holder_name: insurance.holder_name || '',
         insured_name: insurance.insured_name || '',
         beneficiary: insurance.beneficiary || '',
@@ -167,6 +189,7 @@ export default function InsurancePage() {
       });
     } else {
       setEditingId(null);
+      setIsCopying(false);
       setFormData(initialFormData);
     }
     setShowForm(true);
@@ -175,6 +198,7 @@ export default function InsurancePage() {
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setIsCopying(false);
     setFormData(initialFormData);
   };
 
@@ -269,30 +293,48 @@ export default function InsurancePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-sm text-slate-500 mb-1">生效保单</div>
-          <div className="text-2xl font-bold text-slate-800">{stats.total}</div>
+      <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+          <div className="text-xs text-slate-500 mb-0.5">生效保单</div>
+          <div className="text-xl font-bold text-slate-800">{stats.total}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-sm text-slate-500 mb-1">年化保费</div>
-          <div className="text-2xl font-bold text-rose-600">
-            ¥{stats.yearlyPremium.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
+        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+          <div className="text-xs text-slate-500 mb-0.5">年化保费</div>
+          <div className="text-xl font-bold text-rose-600">
+            ¥
+            {stats.yearlyPremium.toLocaleString('zh-CN', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            })}
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-sm text-slate-500 mb-1">总保额</div>
-          <div className="text-2xl font-bold text-emerald-600">
-            ¥{stats.totalCoverage.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
+        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+          <div className="text-xs text-slate-500 mb-0.5">总保额</div>
+          <div className="text-xl font-bold text-emerald-600">
+            ¥
+            {stats.totalCoverage.toLocaleString('zh-CN', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            })}
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-sm text-slate-500 mb-1">近期续保</div>
-          <div className="text-2xl font-bold text-amber-600">{stats.renewalSoon}</div>
+        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+          <div className="text-xs text-slate-500 mb-0.5">月度保费</div>
+          <div className="text-xl font-bold text-indigo-600">
+            ¥
+            {Math.round(stats.yearlyPremium / 12).toLocaleString('zh-CN', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            })}
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+          <div className="text-xs text-slate-500 mb-0.5">近期续保</div>
+          <div className="text-xl font-bold text-amber-600">{stats.renewalSoon}</div>
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <button
           onClick={() => setFilterType('')}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -316,6 +358,27 @@ export default function InsurancePage() {
             {INSURANCE_TYPE_LABELS[type]}
           </button>
         ))}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-sm text-slate-500">被保险人:</span>
+          <div className="relative">
+            <input
+              type="text"
+              value={filterInsured}
+              onChange={(e) => setFilterInsured(e.target.value)}
+              placeholder="搜索被保险人"
+              className="px-3 py-1.5 pr-7 rounded-lg border border-slate-200 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+            />
+            {filterInsured && (
+              <button
+                type="button"
+                onClick={() => setFilterInsured('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm leading-none"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -358,6 +421,13 @@ export default function InsurancePage() {
                       <h3 className="font-semibold text-slate-800">{insurance.name}</h3>
                       <span
                         className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          INSURANCE_TYPE_COLORS[insurance.insurance_type]
+                        }`}
+                      >
+                        {INSURANCE_TYPE_LABELS[insurance.insurance_type]}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-medium ${
                           insurance.status === 'active'
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'bg-slate-100 text-slate-500'
@@ -369,6 +439,24 @@ export default function InsurancePage() {
                     {insurance.provider && (
                       <div className="text-sm text-slate-500 mt-0.5">{insurance.provider}</div>
                     )}
+                    <div className="flex items-center gap-4 mt-1.5 text-sm">
+                      {insurance.holder_name && (
+                        <span className="text-slate-500">
+                          投保人:{' '}
+                          <span className="font-medium text-slate-700">
+                            {insurance.holder_name}
+                          </span>
+                        </span>
+                      )}
+                      {insurance.insured_name && (
+                        <span className="text-slate-500">
+                          被保险人:{' '}
+                          <span className="font-medium text-slate-700">
+                            {insurance.insured_name}
+                          </span>
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-4 mt-2 text-sm">
                       <span className="text-slate-500">
                         保费:{' '}
@@ -403,6 +491,12 @@ export default function InsurancePage() {
                     编辑
                   </button>
                   <button
+                    onClick={() => handleOpenForm(insurance, true)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 hover:bg-emerald-50 transition-colors"
+                  >
+                    复制
+                  </button>
+                  <button
                     onClick={() => handleDelete(insurance.id)}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
                   >
@@ -420,7 +514,7 @@ export default function InsurancePage() {
           <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-slate-200">
               <h2 className="text-xl font-bold text-slate-800">
-                {editingId ? '编辑保险' : '添加保险'}
+                {isCopying ? '复制保险' : editingId ? '编辑保险' : '添加保险'}
               </h2>
             </div>
             <div className="p-6 space-y-4">
